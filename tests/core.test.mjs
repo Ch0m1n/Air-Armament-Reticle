@@ -34,6 +34,30 @@ test('published catalog supports an empty skeleton without test data',()=>{
   if(!publishedCatalog.datasets.length){assert.equal(publishedCatalog.defaultDataset,null);assert.deepEqual(publishedCatalog.entries,[]);assert.deepEqual(publishedCatalog.hashes,{});}
   assert(publishedCatalog.entries.every(entry=>!entry.datasetId.includes('fixture-')));
 });
+test('automatic dataset defaults select one Essex torpedo aircraft in either game',()=>{
+  const folder=fs.mkdtempSync(path.join(artifactRoot,'default-selection-'));
+  try{
+    for(const dir of ['src','tools'])fs.mkdirSync(path.join(folder,dir));
+    for(const file of ['src/viewer-source.html','tools/reindex.mjs'])fs.copyFileSync(path.join(root,file),path.join(folder,file));
+    for(const game of ['WOWS','KORABLI']){
+      writeFixtureDataset(folder,game,'test-home');
+      const base=path.join(folder,'GAME',game,'test-home');
+      fs.writeFileSync(path.join(base,'dataset.json'),JSON.stringify({dataset:'Synthetic home defaults'}));
+      fs.writeFileSync(path.join(base,'Ships/TEST999_Essex.json'),JSON.stringify({name:'TEST999_Essex',typeinfo:{type:'Ship',species:'AirCarrier'},A1_TorpedoBomber:{planes:['TEST_TORPEDO_STOCK']},A2_TorpedoBomber:{planes:['TEST_TORPEDO_TOP']}}));
+    }
+    const indexed=spawnSync(process.execPath,[path.join(folder,'tools/reindex.mjs')],{encoding:'utf8'});assert.equal(indexed.status,0,indexed.stderr);
+    const output=JSON.parse(fs.readFileSync(path.join(folder,'GAME/catalog.json')));
+    for(const dataset of output.datasets){
+      assert.equal(dataset.defaults.length,1);
+      const entry=output.entries.find(e=>e.id===dataset.defaults[0]);
+      assert.equal(entry.datasetId,dataset.id);assert.equal(entry.ship,'Essex');assert.equal(entry.role,'torpedo');assert.equal(entry.aircraft,'TEST_TORPEDO_STOCK');
+    }
+  }finally{
+    if(!folder.startsWith(artifactRoot+path.sep))throw Error('Invalid default test folder');
+    fs.rmSync(folder,{recursive:true,force:true});
+  }
+});
+
 test('catalog paths, identities, hashes and default references are complete',()=>{
   assert.equal(catalog.schema,2);assert(catalog.entries.length>0);
   assert(!catalog.entries.some(entry=>/DISABLED|PRESERVED/i.test(entry.shipId)));

@@ -54,7 +54,11 @@ for(const [folder,game]of [['WOWS','wows'],['KORABLI','korabli']]) {
       const entry=datasetEntries.find(entry=>entry.id===id||entry.legacyId===id);if(!entry)throw Error('Default comparison has incomplete JSON: '+dataset.id+' / '+id);
       dataset.defaults.push(entry.id);
     }
-    if(!metadata.defaults)dataset.defaults=datasetEntries.slice(0,3).map(entry=>entry.id);
+    if(!metadata.defaults){
+      const starter=datasetEntries.find(entry=>entry.role==='torpedo'&&entry.ship.toLowerCase()==='essex')
+        ||datasetEntries.find(entry=>entry.role==='torpedo')||datasetEntries[0];
+      dataset.defaults=starter?[starter.id]:[];
+    }
     entries.push(...datasetEntries);datasets.push(dataset);
   }
 }

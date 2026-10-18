@@ -493,6 +493,7 @@ for(const name of ['dragover','dragleave','drop'])ui('drop').addEventListener(na
       const ids=query.has('aircraft')?query.get('aircraft').split(',').filter(Boolean).slice(0,12):defaultEntries();
       for(const id of ids)await addEntry(id);
     }
+    if(!query.has('type')&&selections.length)comparisonRole=selections[0].kind;
     if(!shipSlots.length)shipSlots.push(newSlot());notice('');
   }catch(error){notice(error.message,true);}
   finally{setBusy(false);renderLibrary();renderComparison();}
