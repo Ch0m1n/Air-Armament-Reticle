@@ -17,7 +17,7 @@ for(const code of selected) {
   const ship=read('Ships',filename.slice(0,-5));store('Ships',ship);
   for(const ref of core.shipManifest(ship,filename).aircraft) {
     let plane,result,weapon;
-    try{plane=read('Aircraft',ref.id);weapon=read('Projectiles',plane.torpedoName||plane.bombName||plane.rocketName||plane.shellName);result=core.analyze(plane,ref.id+'.json',weapon);if(!result.projectile)continue;
+    try{plane=read('Aircraft',ref.id);weapon=read('Projectiles',core.aircraftWeaponId(plane));result=core.aircraftRecord(plane,ref.id+'.json',weapon);if(!result.projectile)continue;
       if(result.kind==='airstrike'){core.attachAirstrikeWeapon(result,weapon);if(!result.weaponVerified)continue;}
     }catch{continue;}
     store('Aircraft',plane);store('Projectiles',weapon);

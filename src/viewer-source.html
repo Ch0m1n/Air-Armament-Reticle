@@ -91,7 +91,16 @@ function manifestAircraft(manifest,abilities) {
   return refs;
 }
 function weaponReferences(raw) {
-  return [...new Set(['bombName','torpedoName','rocketName','shellName'].map(key=>raw?.[key]).filter(validId))];
+  return [...new Set(['bombName','torpedoName','rocketName','shellName','skipBombName'].map(key=>raw?.[key]).filter(validId))];
+}
+function aircraftWeaponId(raw){return raw?.torpedoName||raw?.bombName||raw?.rocketName||raw?.shellName||raw?.skipBombName||null;}
+function isSkipAircraft(raw,weapon=null){return !!raw?.skipBombName||raw?.typeinfo?.species==='Skip'||/skip/i.test(raw?.name||'')||weapon?.planeAmmoType==='skip'||weapon?.typeinfo?.species==='SkipBomb';}
+function aircraftRecord(raw,filename,weapon=null){
+  if(!isSkipAircraft(raw,weapon))return analyze(raw,filename,weapon);
+  const projectile=aircraftWeaponId(raw);
+  if(raw?.typeinfo?.type!=='Aircraft'||!validId(raw.name)||!validId(projectile)||weapon?.name!==projectile)throw Error('Skip-bomber reference requires matching Aircraft and Projectile identities.');
+  if(!(weapon.planeAmmoType==='skip'||weapon.typeinfo?.species==='SkipBomb')||!['HE','AP','CS','SAP'].includes(weapon.ammoType))throw Error('Skip-bomber reference requires a non-ASW SkipBomb projectile.');
+  return {kind:'skip',name:raw.name,filename,projectile,raw,geometrySupported:false,warnings:['Reference data only. Skip-bomber aiming geometry is under maintenance; no bomb ellipse or drop simulation is calculated.']};
 }
 function commonMetricExtent(items) {
   return Math.max(1,...items.filter(r=>!r.referenceOnlyReason&&(['bomb','attack'].includes(r.kind)||r.kind==='airstrike'&&r.weaponVerified)).flatMap(r=>[r.outer,r.aimMinimum,r.aimInner].filter(Boolean).flatMap(d=>[d.width,d.height]).concat(r.reference?[263]:[])));
@@ -252,7 +261,7 @@ function analyze(input, filename, weapon=null) {
   // Reserved categories must not fall through to generic bomb or torpedo geometry.
   const rocket=!!raw.rocketName||weapon?.planeAmmoType==='rocket'||weapon?.typeinfo?.species==='Rocket';
   if(rocket&&(!weapon||weapon.name!==result.projectile||!(weapon.planeAmmoType==='rocket'||weapon.typeinfo?.species==='Rocket')))throw Error('Attack aircraft requires a matching Rocket projectile.');
-  if(/skip/i.test(raw.name||'')||raw.typeinfo?.species==='Skip')throw Error('Skip-bomber reticle geometry is not supported yet.');
+  if(isSkipAircraft(raw,weapon))throw Error('Skip-bomber reticle geometry is not supported yet.');
   if(rocket)return analyzeAttack(result);
   if (typeof raw.minSpread === 'number' && typeof raw.maxSpread === 'number' && raw.formations?.attack) {
     result.kind = 'torpedo';

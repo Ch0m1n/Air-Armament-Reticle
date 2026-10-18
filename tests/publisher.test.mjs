@@ -106,6 +106,29 @@ test('preview selects only connected supported JSON and excludes ASW and unrelat
   assert.equal(plan.files.size,9);assert(![...plan.files.keys()].some(file=>/UNREFERENCED|credentials|TEST_DC|TEST_ASW/.test(file)));
   assert.equal(plan.summary.repository,repository);
 });
+test('skip-only ships and their referenced files are retained without geometry, including parallel scans',async()=>{
+  const folder=sourceFixture('skip-data-only');
+  const plane={name:'TEST_SKIP_PLANE',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB'};
+  const weapon={name:'TEST_SKIP_BOMB',typeinfo:{type:'Projectile',species:'SkipBomb'},planeAmmoType:'skip',ammoType:'HE'};
+  const ship={name:'TEST001_Skip_Carrier',typeinfo:{type:'Ship',species:'AirCarrier'},A_SkipBomber:{planes:[plane.name]}};
+  fs.writeFileSync(path.join(folder,'Ships',ship.name+'.json'),JSON.stringify(ship));
+  fs.writeFileSync(path.join(folder,'Aircraft',plane.name+'.json'),JSON.stringify(plane));
+  fs.writeFileSync(path.join(folder,'Projectiles',weapon.name+'.json'),JSON.stringify(weapon));
+  fs.writeFileSync(path.join(folder,'Aircraft/UNREFERENCED_SKIP.json'),JSON.stringify({...plane,name:'UNREFERENCED_SKIP'}));
+  const args={...options,source:folder},plan=collectDataset(args);
+  assert.deepEqual(plan.summary.counts,{Ships:2,Aircraft:5,Projectiles:3});assert.equal(plan.summary.configurations,5);
+  assert(plan.summary.shipDecisions.find(r=>r.ship===ship.name).included);
+  assert([...plan.files.keys()].some(file=>file.endsWith('/TEST_SKIP_BOMB.json')));
+  assert(![...plan.files.keys()].some(file=>file.includes('UNREFERENCED_SKIP')));
+  const parallel=await collectDatasetParallel({...args,concurrency:2});
+  assert.equal(parallel.summary.manifestHash,plan.summary.manifestHash);
+  const bad={...weapon,ammoType:'DC'};
+  fs.writeFileSync(path.join(folder,'Projectiles',weapon.name+'.json'),JSON.stringify(bad));
+  const rejected=collectDataset(args);
+  assert(!rejected.summary.shipDecisions.find(r=>r.ship===ship.name).included);
+  assert(![...rejected.files.keys()].some(file=>file.endsWith('/TEST_SKIP_BOMB.json')));
+});
+
 test('source folders may use singular names; traversal and reserved versions are rejected',()=>{
   const folder=sourceFixture('singular');fs.renameSync(path.join(folder,'Ships'),path.join(folder,'Ship'));fs.renameSync(path.join(folder,'Projectiles'),path.join(folder,'Projectile'));
   assert.equal(collectDataset({...options,source:folder}).summary.counts.Ships,1);

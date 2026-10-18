@@ -204,10 +204,10 @@ async function addEntry(id,slot=null) {
   if(!old&&selections.length>=12)throw Error('Comparison limit reached (12).');
   const [ship,plane,weapon]=await Promise.all(entry.files.map(repositoryJson));
   if(ship.name!==entry.shipId||plane.name!==entry.aircraft)throw Error('Repository identity mismatch');
-  const base=analyze(plane,plane.name+'.json',weapon);if(base.projectile!==weapon.name)throw Error('Weapon reference mismatch');
+  const base=aircraftRecord(plane,plane.name+'.json',weapon);if(base.projectile!==weapon.name)throw Error('Weapon reference mismatch');
   const overrides=old&&old.catalogId!==entry.id?{}:slot?.modifiers||{};
   const modified=modifiedInputs(base.kind,plane,weapon,overrides);
-  const item=analyze(modified.aircraft,plane.name+'.json',modified.projectile);
+  const item=aircraftRecord(modified.aircraft,plane.name+'.json',modified.projectile);
   attachData(item,modified.projectile,[shipManifest(ship,ship.name+'.json')]);
   if(!slot){slot=slotFromEntry(entry);shipSlots.push(slot);}
   slot.modifiers=modified.overrides;
@@ -436,8 +436,8 @@ async function importFiles(list) {
       try {
         const old=selections.find(item=>!item.catalogId&&item.name===name);
         if(!old&&selections.length>=12)continue;
-        const weapon=uploadedWeapons.get(file.raw.torpedoName||file.raw.bombName||file.raw.rocketName||file.raw.shellName);
-        const item=analyze(file.raw,file.filename,weapon);attachData(item,weapon,[...uploadedShips.values()]);
+        const weapon=uploadedWeapons.get(aircraftWeaponId(file.raw));
+        const item=aircraftRecord(file.raw,file.filename,weapon);attachData(item,weapon,[...uploadedShips.values()]);
         if(item.kind==='airstrike'&&item.excluded){if(old)selections.splice(selections.indexOf(old),1);continue;}
         Object.assign(item,{id:old?.id||nextSelection++,game:activeGame,reference:old?.reference??true,rotation:old?.rotation||0,shipLabel:[...uploadedShips.values()].find(ship=>manifestAircraft(ship,new Map()).some(ref=>ref.id===name))?.name||'Uploaded aircraft'});
         if(old)selections[selections.indexOf(old)]=item;else selections.push(item);

@@ -73,13 +73,13 @@ export function collectDataset({source,game,version,onProgress=()=>{},shipSubset
     const eligibleAircraft=[];let excludedAsw=0,excludedOther=0;
     for(const reference of manifest.aircraft){
       try{
-        const plane=read('Aircraft',reference.id),projectile=plane.torpedoName||plane.bombName||plane.rocketName||plane.shellName;
+        const plane=read('Aircraft',reference.id),projectile=core.aircraftWeaponId(plane);
         if(!validId(projectile))throw Error('No supported weapon reference');
         const weapon=read('Projectiles',projectile);
         // Classify the weapon before geometry: ASW aircraft may not have bomber reticle inputs.
         if(['DC','depthcharge'].includes(weapon.ammoType)||weapon.planeAmmoType==='depthcharge'||weapon.typeinfo?.species==='DepthCharge')throw Object.assign(Error('ASW/DC excluded'),{exclusion:'asw'});
-        const result=core.analyze(plane,reference.id+'.json',weapon);
-        if(result.projectile!==projectile||!['bomb','torpedo','airstrike','attack'].includes(result.kind))throw Error('Unsupported geometry');
+        const result=core.aircraftRecord(plane,reference.id+'.json',weapon);
+        if(result.projectile!==projectile||!['bomb','torpedo','airstrike','attack','skip'].includes(result.kind))throw Error('Unsupported aircraft reference');
         if(result.kind==='airstrike'){core.attachAirstrikeWeapon(result,weapon);if(!result.weaponVerified)throw Error('Unverified airstrike weapon');}
         if(result.kind==='torpedo'&&weapon.ammoType!=='torpedo'&&weapon.planeAmmoType!=='torpedo')throw Error('Torpedo weapon mismatch');
         if(core.referenceOnlyReason(result,[manifest],new Map(),new Map([[weapon.name,weapon]])))throw Error('Unsupported air-support reference');

@@ -91,6 +91,19 @@ test('attack aircraft require verified rocket identity; skip geometry remains ex
   assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,240);
 });
 
+test('skip records retain matching dependencies without invoking any geometry',()=>{
+  const plane={name:'TEST_SKIP',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB'};
+  const weapon={name:'TEST_SKIP_BOMB',ammoType:'HE',planeAmmoType:'skip',typeinfo:{type:'Projectile',species:'SkipBomb'}};
+  const record=core.aircraftRecord(plane,'skip.json',weapon);
+  assert.equal(record.kind,'skip');assert.equal(record.geometrySupported,false);assert.equal(record.projectile,weapon.name);assert.equal(record.outer,undefined);
+  assert.throws(()=>core.analyze(plane,'skip.json',weapon),/Skip-bomber/);
+  assert.throws(()=>core.aircraftRecord(plane,'skip.json',{...weapon,name:'OTHER'}),/matching/);
+  assert.throws(()=>core.aircraftRecord(plane,'skip.json',{...weapon,ammoType:'DC'}),/non-ASW/);
+  const alternative={...plane,bombName:undefined,skipBombName:weapon.name};
+  assert.equal(core.aircraftRecord(alternative,'skip.json',weapon).projectile,weapon.name);
+  assert(core.weaponReferences(alternative).includes(weapon.name));
+});
+
 test('rocket salvo geometry is independent of bomber movement and inverse maximum-spread scaling',()=>{
   const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
   const raw={name:'TEST_ATTACK',bombName:weapon.name,outerSalvoSize:[6,4],minSpread:[1,0.7],maxSpread:[4,2.8],speedMoveWithBomb:124,attackCount:26,attackInterval:0.03};

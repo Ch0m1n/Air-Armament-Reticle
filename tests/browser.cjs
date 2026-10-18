@@ -43,7 +43,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     // Fixtures are invented values, generated only in an ignored temporary test site.
     fs.cpSync(path.join(root,'src'),path.join(fixture,'src'),{recursive:true});fs.mkdirSync(path.join(fixture,'tools'));
     for(const name of ['build.mjs','reindex.mjs','preview.mjs'])fs.copyFileSync(path.join(root,'tools',name),path.join(fixture,'tools',name));
-    const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version,true);
+    const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version,true,true);
     const wowsBombPath=path.join(fixture,'GAME/WOWS/fixture-A/Aircraft/TEST_BOMBER.json');
     const wowsBomb=JSON.parse(fs.readFileSync(wowsBombPath));wowsBomb.outerSalvoSize[0]=3;fs.writeFileSync(wowsBombPath,JSON.stringify(wowsBomb));
     for(const tool of ['reindex.mjs','build.mjs']){const result=spawnSync(process.execPath,[path.join(fixture,'tools',tool)],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
@@ -110,7 +110,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
         return values;
       }finally{catalog.entries=saved;renderLibrary();}
     }),['','bomb']);
-    assert.deepEqual(await first.locator('[data-field="role"] option').evaluateAll(options=>options.map(o=>o.value)),['','bomb','torpedo','airstrike','attack']);
+    assert.deepEqual(await first.locator('[data-field="role"] option').evaluateAll(options=>options.map(o=>o.value)),['','bomb','torpedo','airstrike','attack','skip']);
     assert.deepEqual(await page.evaluate(()=>{
       const saved=catalog.entries;
       try{
@@ -184,7 +184,16 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.setViewportSize({width:390,height:844});await attackCard.scrollIntoViewIfNeeded();
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await page.screenshot({path:path.join(artifacts,'attack-mobile.png')});
-    assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import, attack outlines and responsive tests');
+    await first.locator('[data-field="role"]').selectOption('skip');await page.waitForFunction(()=>!busy);
+    await first.locator('[data-field="entryId"]').selectOption({label:'TEST_SKIP'});await page.waitForFunction(()=>!busy);
+    await page.locator('#comparison-tab-skip').click();
+    assert.equal(await page.locator('#comparison-skip article').count(),0);
+    assert((await page.locator('#comparison-skip').innerText()).includes('Under the Maintenance!'));
+    assert(await page.evaluate(()=>selections.some(r=>r.kind==='skip'&&!r.outer&&r.geometrySupported===false)));
+    await page.locator('#share').click();const skipLink=await page.evaluate(()=>navigator.clipboard.readText());
+    await page.goto(skipLink);await page.waitForFunction(()=>!busy);
+    assert(await page.evaluate(()=>selections.some(r=>r.kind==='skip'&&!r.outer)));
+    assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import, attack outlines, skip data-only selection and responsive tests');
   }finally{
     if(browser)await browser.close();
     for(const server of servers)if(server.exitCode===null){const stopped=new Promise(resolve=>server.once('exit',resolve));server.kill();await stopped;}
