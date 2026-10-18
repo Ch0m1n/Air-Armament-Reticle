@@ -3,7 +3,7 @@ const modifierDefinitions={
   airstrike:[['outerSalvoSize','Outer salvo size','raw',0.0001,10000],['innerSalvoSize','Inner salvo size','raw',0.0001,10000],['minSpread','Minimum spread','raw',0.0001,10000],['innerBombsPercentage','Inner allocation','%',0,100],['speedMoveWithBomb','Release speed','kn',0.0001,1000],['speedMax','Maximum speed multiplier','ratio',1,10],['throttleAcceleration','Throttle acceleration','raw',0,100],['throttleDeceleration','Throttle deceleration','raw',0,100],['flightHeight','Flight height','raw',0,10000],['attackerSize','Attacking aircraft','count',1,50,true],['projectilesPerAttack','Payload per release','count',1,50,true],['attackCount','Releases','count',1,50,true],['attackInterval','Release interval','s',0,120]],
   torpedo:[['minSpread','Minimum spread','raw',0,10000],['maxSpread','Maximum spread','raw',0,10000],['torpedoAimDist','Aim distance','raw',0.0001,10000],['projectilesPerAttack','Payload per release','count',1,50,true],['attackCount','Releases','count',1,50,true],['maxDist','Torpedo range','raw × 30 m',0.0001,10000,false,'projectile'],['speed','Torpedo speed','kn',0.0001,1000,false,'projectile'],['armingTime','Arming time','s',0,120,false,'projectile']]
 };
-modifierDefinitions.attack=modifierDefinitions.bomb;
+modifierDefinitions.attack=[['outerSalvoSize','Outer salvo size','raw',0.0001,10000],['minSpread','Minimum spread','raw',0.0001,10000],['maxSpread','Maximum spread','raw',0.0001,10000]];
 function modifierFields(kind,plane,weapon) {
   return (modifierDefinitions[kind]||[]).flatMap(([key,label,unit,min,max,integer,target='aircraft'])=>{
     const value=(target==='aircraft'?plane:weapon)?.[key];
@@ -14,7 +14,7 @@ function modifierFields(kind,plane,weapon) {
 }
 function modifierKey(field){return field.target+':'+field.key+(field.index==null?'':':'+field.index);}
 function modifierHelp(kind,field) {
-  if(kind==='attack')return 'Experimental bomber-model approximation for rocket aircraft; effects and meter conversion are not verified for rockets. '+modifierHelp('bomb',field);
+  if(kind==='attack')return `Experimental rocket ${field.index===0?'width':'length'} = 30 x outer salvo size x ${field.key==='maxSpread'?'maximum':'minimum'} spread on the same axis. Width is fitted to two supplied screenshots; length and maximum spread remain unverified. Release travel and inner allocation are not modeled.`;
   const axis=field.index===0?'width':'length';
   if(field.key==='outerSalvoSize')return `Base ${axis} of the outer bomb region in raw game units, not meters. ${kind==='airstrike'?'Combined with minimum spread and release travel to estimate the overall drop envelope.':'Combined with the spread ratio and release travel to estimate the maximum aiming outline.'}`;
   if(field.key==='innerSalvoSize')return `Base ${axis} of the inner bomb distribution region, in raw game units. This is not the minimum aiming outline or a ship hit probability.`;

@@ -169,13 +169,16 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await first.locator('[data-field="entryId"]').selectOption({label:'TEST_ATTACK'});await page.waitForFunction(()=>!busy);
     await page.locator('#comparison-tab-attack').click();
     const attackCard=page.locator('#comparison-attack article').first();
-    assert((await attackCard.innerText()).includes('Experimental bomber approximation'));
+    assert((await attackCard.innerText()).includes('Salvo x spread (experimental)'));
     assert.equal(await attackCard.locator('.ellipse-maximum').count(),1);
+    assert.equal(await attackCard.locator('[data-action^="aim-"]').count(),0);
     assert.equal(await attackCard.locator('.ellipse-outer').count(),1);
     assert.equal(await attackCard.locator('.ellipse-distribution').count(),0);
     assert.equal(await attackCard.locator('[data-action="play"]').count(),0);
     await attackCard.locator('[data-action="expand"]').click();
-    assert((await drawingDialog.innerText()).includes('rocket scale unverified'));
+    assert((await drawingDialog.innerText()).includes('Length schematic'));
+    assert.equal(await drawingDialog.locator('.ellipse-maximum').count(),1);
+    assert.equal(await drawingDialog.locator('.ellipse-outer').count(),1);
     await page.screenshot({path:path.join(artifacts,'expanded-attack-desktop.png')});
     await page.keyboard.press('Escape');
     await page.setViewportSize({width:390,height:844});await attackCard.scrollIntoViewIfNeeded();

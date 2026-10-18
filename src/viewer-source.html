@@ -229,6 +229,20 @@ function simulateAirstrike(r,random=Math.random) {
   }
   return points;
 }
+function analyzeAttack(result) {
+  const raw=result.raw;
+  if(!pair(raw.outerSalvoSize)||!pair(raw.minSpread)||!pair(raw.maxSpread)||raw.minSpread.some((n,i)=>n>raw.maxSpread[i]))throw Error('Rocket outline requires positive salvo and consistent two-axis spread inputs.');
+  // Width scale is an empirical fit to the supplied fully aimed Roosevelt/Colossus captures.
+  // Longitudinal geometry is provisional; do not reuse bomber release-travel offsets.
+  const ellipse=spread=>({width:30*raw.outerSalvoSize[0]*spread[0],height:30*raw.outerSalvoSize[1]*spread[1]});
+  result.kind='attack';result.geometryModel='rocket-salvo-v1';
+  result.outer=ellipse(raw.maxSpread);result.aimMinimum=ellipse(raw.minSpread);
+  if(![result.outer.width,result.outer.height,result.aimMinimum.width,result.aimMinimum.height].every(positive))throw Error('Invalid rocket outline dimensions.');
+  result.inner=null;result.aimInner=null;result.innerPercentage=null;
+  result.warnings.push('Experimental rocket width = 30 x outerSalvoSize X x spread X. Initial full-aim calibration uses supplied Roosevelt and Colossus screenshots; maximum-width spot checks include Roosevelt, Graf Zeppelin, Saipan and Aquila relative to Yamato. This is not verified client code or a guarantee for other versions.');
+  result.warnings.push('Length is schematic: 30 x outerSalvoSize Y x spread Y. The supplied full-outline Aquila capture has a similar aspect ratio, but perspective and visual measurement uncertainty prevent universal length validation. Bomber release-travel offsets, inner allocation, launch timing and rocket trajectories are not modeled.');
+  return result;
+}
 function analyze(input, filename, weapon=null) {
   if (!input || Array.isArray(input) || typeof input !== 'object') throw Error('Expected one Aircraft JSON object.');
   if (input.typeinfo?.type && input.typeinfo.type !== 'Aircraft') throw Error('This is not an Aircraft file.');
@@ -239,6 +253,7 @@ function analyze(input, filename, weapon=null) {
   const rocket=!!raw.rocketName||weapon?.planeAmmoType==='rocket'||weapon?.typeinfo?.species==='Rocket';
   if(rocket&&(!weapon||weapon.name!==result.projectile||!(weapon.planeAmmoType==='rocket'||weapon.typeinfo?.species==='Rocket')))throw Error('Attack aircraft requires a matching Rocket projectile.');
   if(/skip/i.test(raw.name||'')||raw.typeinfo?.species==='Skip')throw Error('Skip-bomber reticle geometry is not supported yet.');
+  if(rocket)return analyzeAttack(result);
   if (typeof raw.minSpread === 'number' && typeof raw.maxSpread === 'number' && raw.formations?.attack) {
     result.kind = 'torpedo';
     result.planes = raw.attackerSize; result.perPlane = raw.projectilesPerAttack; result.releases = raw.attackCount;
@@ -263,7 +278,7 @@ function analyze(input, filename, weapon=null) {
     return result;
   }
   if (pair(raw.outerSalvoSize) || pair(raw.innerSalvoSize) || pair(raw.reticleSize) || pair(raw.reticleSizeMax)) {
-    result.kind = rocket?'attack':'bomb';
+    result.kind = 'bomb';
     if (!pair(raw.maxSpread)) throw Error('Bomb estimate requires a positive two-element maxSpread array.');
     if (!finite(raw.speedMoveWithBomb) || raw.speedMoveWithBomb < 0 || !Number.isInteger(raw.attackCount) || raw.attackCount < 1
       || !finite(raw.attackInterval) || raw.attackInterval < 0) throw Error('Missing or invalid movement/release inputs; cannot calculate a trustworthy estimate.');
@@ -288,7 +303,6 @@ function analyze(input, filename, weapon=null) {
     if(!result.aimMinimum)result.warnings.push('Minimum aiming outline unavailable: missing or inconsistent minSpread.');
     result.innerPercentage = finite(raw.innerBombsPercentage) && raw.innerBombsPercentage>=0 && raw.innerBombsPercentage<=100 ? raw.innerBombsPercentage : null;
     result.warnings.push('MKtool estimate, not an independently verified in-game formula.');
-    if(rocket)result.warnings.push('Experimental rocket outline using the bomber model. Meter dimensions, release travel and inner allocation are not validated for rockets; this is not a rocket trajectory or hit-probability simulation.');
     result.warnings.push('Raw file only: aiming state, maneuvering and build effects are not simulated.');
     if (/skip/i.test(raw.name || '') || raw.typeinfo?.species === 'Skip') result.warnings.push('Skip-bomber geometry may differ; this generic bomb estimate is not validated for skip bombers.');
     return result;
@@ -321,18 +335,28 @@ function airstrikeDrawing(r,extent=Math.max(r.outer.width,r.outer.height,r.refer
 function targetDistance(r,distanceScale) {
   return Math.max(0,Math.min(distanceScale,finite(r.targetDistance)?r.targetDistance:Math.min(distanceScale,r.armingDistance||distanceScale*.3)));
 }
-function bombDrawing(r,extent=null) {
+function rocketViewDimensions(r) {
+  return r.outer;
+}
+function commonRocketScale(items) {
+  const bounds=items.map(r=>{
+    const d=rocketViewDimensions(r),rotated=!!r.rotation;
+    return {width:Math.max(d.width,r.reference?(rotated?263:38.9):0),height:Math.max(d.height,r.reference?(rotated?38.9:263):0)};
+  });
+  return Math.min(260/Math.max(1,...bounds.map(b=>b.width)),160/Math.max(1,...bounds.map(b=>b.height)));
+}
+function bombDrawing(r,extent=null,rocketScale=null) {
   const dimensions=[r.outer,r.aimMinimum,r.aimInner].filter(Boolean);
   if(!dimensions.length)return '<svg viewBox="0 0 300 240" role="img" aria-label="Minimum aiming outline unavailable"><text x="150" y="123" text-anchor="middle">Minimum aiming outline unavailable</text></svg>';
   const rotated=!!r.rotation;
-  const scale=positive(extent)?160/extent:Math.min(210/Math.max(...dimensions.map(d=>d.width),r.reference?(rotated?263:38.9):0),160/Math.max(...dimensions.map(d=>d.height),r.reference?(rotated?38.9:263):0));
+  const scale=r.kind==='attack'?(positive(rocketScale)?rocketScale:commonRocketScale([r])):positive(extent)?160/extent:Math.min(210/Math.max(...dimensions.map(d=>d.width),r.reference?(rotated?263:38.9):0),160/Math.max(...dimensions.map(d=>d.height),r.reference?(rotated?38.9:263):0));
   const d=r.aimMinimum;
   const maximum=r.outer?`<ellipse class="ellipse-maximum" cx="150" cy="112" rx="${r.outer.width*scale/2}" ry="${r.outer.height*scale/2}"/>`:'';
   const minimum=d?`<ellipse class="ellipse-outer" cx="150" cy="112" rx="${d.width*scale/2}" ry="${d.height*scale/2}"/>`:'';
   const region=r.kind==='attack'?null:bomberSimulationRegion(r).inner;
   const inner=region?`<ellipse class="ellipse-distribution" cx="150" cy="112" rx="${region.width*scale/2}" ry="${region.height*scale/2}"/>`:'';
   const drops=(r.attack?.points||[]).map(p=>`<circle class="bomber-drop" fill="#da633e" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.5"/>`).join('');
-  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="${r.kind==='attack'?'Experimental rocket aiming outlines using bomber approximation':'Estimated minimum and maximum aiming outlines and illustrative bomb drops'}"><text x="150" y="18" text-anchor="middle">${r.kind==='attack'?'Rocket aim · experimental estimate':'Aiming outline estimate'}</text>${maximum}${minimum}${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${inner}${drops}<text x="150" y="218" text-anchor="middle">Minimum: green · Maximum: dashed amber</text><text x="150" y="234" text-anchor="middle">${r.kind==='attack'?'Bomber model · rocket scale unverified':r.attack?.points.length?`${r.attack.points.length} illustrative drops · not game RNG`:region?`Inner: dashed red${r.innerPercentage==null?'':` · ${r.innerPercentage}% of bombs`}`:'Inner region unavailable'}</text></svg>`;
+  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="${r.kind==='attack'?'Experimental width-calibrated rocket outlines; length unverified':'Estimated minimum and maximum aiming outlines and illustrative bomb drops'}"><text x="150" y="18" text-anchor="middle">${r.kind==='attack'?'Rocket aim · width-calibrated estimate':'Aiming outline estimate'}</text>${maximum}${minimum}${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${inner}${drops}<text x="150" y="218" text-anchor="middle">Minimum: green · Maximum: dashed amber</text><text x="150" y="234" text-anchor="middle">${r.kind==='attack'?'Length schematic · no release-travel offset':r.attack?.points.length?`${r.attack.points.length} illustrative drops · not game RNG`:region?`Inner: dashed red${r.innerPercentage==null?'':` · ${r.innerPercentage}% of bombs`}`:'Inner region unavailable'}</text></svg>`;
 }
 function bomberPayload(r) {
   const values=[r.raw.attackerSize,r.raw.projectilesPerAttack,r.raw.attackCount];

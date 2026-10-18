@@ -81,14 +81,69 @@ test('attack aircraft require verified rocket identity; skip geometry remains ex
   assert.throws(()=>core.analyze({...plane,typeinfo:{...plane.typeinfo,species:'Skip'}},'skip.json'),/Skip-bomber/);
   const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
   const attack=core.analyze({...plane,bombName:'TEST_ROCKET'},'attack.json',weapon);
-  assert.equal(attack.kind,'attack');assert(attack.warnings.some(w=>w.includes('not validated for rockets')));
+  assert.equal(attack.kind,'attack');assert(attack.warnings.some(w=>w.includes('not verified client code')));
   const explicit=core.analyze({...plane,bombName:null,rocketName:'TEST_ROCKET'},'attack.json',weapon);
   assert.equal(explicit.kind,'attack');
   assert.throws(()=>core.analyze({...plane,rocketName:'OTHER'},'attack.json',weapon),/matching Rocket/);
-  assert(core.bombDrawing(attack).includes('rocket scale unverified'));
+  assert(core.bombDrawing(attack).includes('Length schematic'));
   assert(!core.bombDrawing(attack).includes('ellipse-distribution'));
   const changed=core.modifiedInputs('attack',attack.raw,weapon,{'aircraft:outerSalvoSize:0':4});
   assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,240);
+});
+
+test('rocket salvo geometry is independent of bomber movement and inverse maximum-spread scaling',()=>{
+  const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
+  const raw={name:'TEST_ATTACK',bombName:weapon.name,outerSalvoSize:[6,4],minSpread:[1,0.7],maxSpread:[4,2.8],speedMoveWithBomb:124,attackCount:26,attackInterval:0.03};
+  const first=core.analyze(raw,'attack.json',weapon);
+  assert.equal(first.aimMinimum.width,180);assert.equal(first.aimMinimum.height,84);
+  assert.equal(first.outer.width,720);assert.equal(first.outer.height,336);
+  const moved=core.analyze({...raw,speedMoveWithBomb:999,attackCount:50,attackInterval:1},'attack.json',weapon);
+  assert.equal(moved.aimMinimum.height,first.aimMinimum.height);
+  const widerMax=core.analyze({...raw,maxSpread:[8,5.6]},'attack.json',weapon);
+  assert.equal(widerMax.aimMinimum.width,first.aimMinimum.width);
+  assert.equal(widerMax.outer.width,first.outer.width*2);
+  assert.throws(()=>core.analyze({...raw,minSpread:[5,1]},'attack.json',weapon),/consistent/);
+  assert.throws(()=>core.analyze({...raw,outerSalvoSize:[0,1]},'attack.json',weapon),/positive/);
+  const fields=core.modifierFields('attack',raw,weapon);
+  assert.equal(fields.length,6);assert(!fields.some(field=>field.key==='attackInterval'));
+  first.reference=true;first.rotation=90;
+  const fullScale=core.commonRocketScale([first]);
+  const widthBefore=first.aimMinimum.width;
+  first.aimMode='immediate';
+  const maxScale=core.commonRocketScale([first]);
+  assert.equal(fullScale,maxScale);
+  assert(Math.abs(fullScale-260/first.outer.width)<1e-8);
+  assert.equal(first.aimMinimum.width,widthBefore);
+  assert(core.bombDrawing(first).includes('ellipse-maximum'));
+  first.aimMode='fully';assert(core.bombDrawing(first).includes('ellipse-maximum'));
+  const shared=core.commonRocketScale([first,widerMax]);
+  assert.equal(core.bombDrawing(first,null,shared).match(/data-metric-scale="([^"]+)"/)[1],core.bombDrawing(widerMax,null,shared).match(/data-metric-scale="([^"]+)"/)[1]);
+});
+
+test('rocket reference inputs preserve per-aircraft axes without ship-specific correction factors',()=>{
+  // Selected 15.10 parameter values, not independent proof of in-game dimensions.
+  const cases=[
+    ['Roosevelt',[6.83,4.1],[1,.7],[4,2.8],204.9,819.6,344.4],
+    ['Colossus',[5.08,1.76],[1,1],[2.5,2.5],152.4,381,132],
+    ['Graf Zeppelin',[3.67,1.47],[1,1],[2.5,2.5],110.1,275.25,110.25],
+    ['Saipan',[3.33,1.33],[1,1],[4,4],99.9,399.6,159.6],
+    ['Aquila',[3.83,3.03],[1,1],[4,4],114.9,459.6,363.6]
+  ];
+  const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket'};
+  for(const [name,outerSalvoSize,minSpread,maxSpread,minWidth,maxWidth,maxHeight]of cases){
+    const raw={name,bombName:weapon.name,outerSalvoSize,minSpread,maxSpread};
+    const r=core.analyze(raw,name+'.json',weapon);
+    assert(Math.abs(r.aimMinimum.width-minWidth)<1e-8,name);
+    assert(Math.abs(r.outer.width-maxWidth)<1e-8,name);
+    assert(Math.abs(r.outer.height-maxHeight)<1e-8,name);
+    r.reference=true;r.rotation=90;
+    const scale=core.commonRocketScale([r]);
+    assert(r.outer.width*scale<=260+1e-8,name);
+    assert(r.outer.height*scale<=160+1e-8,name);
+    const renamed=core.analyze({...raw,name:'UNRELATED'},'other.json',weapon);
+    assert.equal(renamed.outer.width,r.outer.width);assert.equal(renamed.outer.height,r.outer.height);
+    const svg=core.bombDrawing(r);assert(svg.includes('ellipse-maximum'));assert(svg.includes('ellipse-outer'));
+  }
 });
 
 test('modifiers use a numeric allowlist and never mutate repository inputs',()=>{
