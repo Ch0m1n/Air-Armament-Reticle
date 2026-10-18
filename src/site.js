@@ -96,7 +96,7 @@ function defaultEntries(){return activeGame==='mixed'?actualGames.flatMap(game=>
 const dimension=value=>value?`${Number(value.width.toFixed(1))} × ${Number(value.height.toFixed(1))} m`:'N/A';
 function comparisonMetrics(item) {
   const source=activeGame==='mixed'&&item.version?[['Version',item.version]]:[];
-  if(item.kind==='attack')return [...source,['Full-aim width (estimate)',Number(item.aimMinimum.width.toFixed(1))+' m'],['Maximum width (estimate)',Number(item.outer.width.toFixed(1))+' m'],['Length','Schematic / unverified'],['Model','Salvo x spread (experimental)']];
+  if(item.kind==='attack')return [...source,['Minimum aim (estimate)',dimension(item.aimMinimum)],['Maximum aim (estimate)',dimension(item.outer)],['Length validation','Unverified'],['Model','Salvo x spread (experimental)']];
   if(item.kind==='bomb')return [...source,['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
   if(item.kind==='torpedo'){
     const sector=torpedoSector(item);

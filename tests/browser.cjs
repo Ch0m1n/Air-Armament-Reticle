@@ -189,6 +189,15 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.locator('#comparison-tab-attack').click();
     const attackCard=page.locator('#comparison-attack article').first();
     assert((await attackCard.innerText()).includes('Salvo x spread (experimental)'));
+    const aimCell=label=>attackCard.locator('tr').filter({has:page.getByRole('rowheader',{name:label,exact:true})}).locator('td');
+    assert.equal(await aimCell('Minimum aim (estimate)').innerText(),'60 × 120 m');
+    assert.equal(await aimCell('Maximum aim (estimate)').innerText(),'120 × 240 m');
+    assert.equal(await aimCell('Length validation').innerText(),'Unverified');
+    await first.locator('[data-slot-action="modifiers"]').click();
+    await page.getByRole('spinbutton',{name:'Minimum spread Y',exact:true}).fill('1.5');
+    await page.locator('#modifiers-form button[type="submit"]').click();await page.waitForFunction(()=>!busy&&!document.querySelector('#modifiers-dialog').open);
+    assert.equal(await aimCell('Minimum aim (estimate)').innerText(),'60 × 180 m');
+    assert.equal(await aimCell('Maximum aim (estimate)').innerText(),'120 × 240 m');
     assert.equal(await attackCard.locator('.ellipse-maximum').count(),1);
     assert.equal(await attackCard.locator('[data-action^="aim-"]').count(),0);
     assert.equal(await attackCard.locator('.ellipse-outer').count(),1);
