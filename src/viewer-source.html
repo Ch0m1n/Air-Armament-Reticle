@@ -172,6 +172,11 @@ function attachAirstrikeWeapon(r,weapon) {
   r.ammo=ammo||null;
   if(!r.weaponVerified)r.attack=null;
 }
+function inferredAirstrikeTiming(params) {
+  return params.useFixedTimeToAttackPoint===undefined
+    &&!['minTimeToAttackPoint','maxTimeToAttackPoint','maxTimeToAttackPointDistance'].some(key=>Object.hasOwn(params,key))
+    &&[params.timeFromHeaven,params.maxPlaneFlightDist].every(n=>finite(n)&&n>=0);
+}
 function airstrikeImpactTime(raw,params,weapon,distance) {
   const nonnegative=n=>finite(n)&&n>=0;
   if(![params.minDist,params.maxDist,distance].every(nonnegative)||params.maxDist<params.minDist)return null;
@@ -181,7 +186,7 @@ function airstrikeImpactTime(raw,params,weapon,distance) {
     const low=params.minTimeToAttackPoint,high=params.maxTimeToAttackPoint,limit=params.maxTimeToAttackPointDistance;
     if(![low,high,limit].every(nonnegative)||high<low)return null;
     approach=limit===0?high:low+(high-low)*Math.min(distance/limit,1);
-  } else if(params.useFixedTimeToAttackPoint===false) {
+  } else if(params.useFixedTimeToAttackPoint===false||inferredAirstrikeTiming(params)) {
     const speed=raw.speedMoveWithBomb*(1852/3600)*2.61*2;
     if(!positive(speed)||![raw.throttleAcceleration,raw.throttleDeceleration,params.timeFromHeaven,params.maxPlaneFlightDist].every(nonnegative))return null;
     const d=Math.min(distance,params.maxPlaneFlightDist);let travel=d/speed;
@@ -203,12 +208,12 @@ function airstrikeTimingRanges(r,manifests,weapon) {
   if(r.kind!=='airstrike'||!r.weaponVerified||weapon?.name!==r.projectile)return [];
   return manifests.flatMap(ship=>(ship.timingSupports||[]).filter(s=>s.plane===r.name).flatMap(s=>{
     const min=airstrikeImpactTime(r.raw,s.params,weapon,s.params.minDist),max=airstrikeImpactTime(r.raw,s.params,weapon,s.params.maxDist);
-    return min==null||max==null?[]:[{ship:ship.name,context:s.context,minRange:s.params.minDist,maxRange:s.params.maxDist,min,max}];
+    return min==null||max==null?[]:[{ship:ship.name,context:s.context,minRange:s.params.minDist,maxRange:s.params.maxDist,min,max,inferredMode:inferredAirstrikeTiming(s.params)}];
   }));
 }
 function airstrikeTimingRows(r) {
   const ranges=r.timingRanges||[];
-  return ranges.length?ranges.map(value=>['Flight time (min-max)'+(ranges.length>1?' / '+value.ship+' / '+value.context:''),
+  return ranges.length?ranges.map(value=>['Flight time (min-max, estimate)'+(ranges.length>1?' / '+value.ship+' / '+value.context:''),
     `${Number(value.min.toFixed(1))}s-${Number(value.max.toFixed(1))}s`]):[['Flight time (min-max)','Unavailable: matching Ship + Projectile timing inputs required']];
 }
 function analyzeAirstrike(result) {

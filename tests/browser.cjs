@@ -48,6 +48,10 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     fs.cpSync(path.join(root,'src'),path.join(fixture,'src'),{recursive:true});fs.mkdirSync(path.join(fixture,'tools'));
     for(const name of ['build.mjs','reindex.mjs','preview.mjs'])fs.copyFileSync(path.join(root,'tools',name),path.join(fixture,'tools',name));
     const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version,true,true);
+    const timingShipPath=path.join(fixture,'GAME/KORABLI/fixture-A/Ships/TST001_Synthetic_Carrier.json');
+    const timingShip=JSON.parse(fs.readFileSync(timingShipPath));
+    for(const key of ['useFixedTimeToAttackPoint','minTimeToAttackPoint','maxTimeToAttackPoint','maxTimeToAttackPointDistance'])delete timingShip.A_AirSupport[key];
+    Object.assign(timingShip.A_AirSupport,{timeFromHeaven:2,maxPlaneFlightDist:1000});fs.writeFileSync(timingShipPath,JSON.stringify(timingShip));
     const wowsBombPath=path.join(fixture,'GAME/WOWS/fixture-A/Aircraft/TEST_BOMBER.json');
     const wowsBomb=JSON.parse(fs.readFileSync(wowsBombPath));wowsBomb.outerSalvoSize[0]=3;fs.writeFileSync(wowsBombPath,JSON.stringify(wowsBomb));
     for(const tool of ['reindex.mjs','build.mjs']){const result=spawnSync(process.execPath,[path.join(fixture,'tools',tool)],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
@@ -55,6 +59,11 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),3);
     const tabKinds=()=>page.locator('[data-comparison-tab]').evaluateAll(tabs=>tabs.map(tab=>tab.dataset.comparisonTab));
     assert.deepEqual(await tabKinds(),['bomb','torpedo','airstrike']);
+    await page.locator('#comparison-tab-airstrike').click();
+    const flight=page.locator('#comparison-airstrike .metric-table tr').filter({has:page.getByRole('rowheader',{name:'Flight time (min-max, estimate)',exact:true})});
+    assert.match(await flight.locator('td').innerText(),/\d+(\.\d+)?s-\d+(\.\d+)?s/);
+    assert((await page.locator('#comparison-airstrike .source-data').textContent()).includes('Source omits useFixedTimeToAttackPoint'));
+    await page.locator('#comparison-tab-bomb').click();
     assert(await page.evaluate(()=>!catalog.entries.some(e=>e.shipId==='TEST_FLOAT_ONLY'||e.aircraft==='TEST_FLOAT_FIGHTER')));
     assert.equal(new URL(page.url()).searchParams.get('type'),'bomb');
     await page.locator('#comparison-tab-bomb').focus();await page.keyboard.press('ArrowLeft');

@@ -61,6 +61,24 @@ test('catalog paths, identities, hashes and default references are complete',()=
     }
   }
 });
+test('omitted airstrike timing flag uses only a complete, unambiguous distance-based model',()=>{
+  const raw={speedMoveWithBomb:100,throttleAcceleration:0,throttleDeceleration:0,speedMax:1.25};
+  const params={minDist:500,maxDist:10000,maxPlaneFlightDist:3000,timeFromHeaven:2};
+  const weapon={withParachute:true,fallTime:5};
+  assert(core.inferredAirstrikeTiming(params));
+  for(const distance of [0,500,1000,10000]){
+    const implicit=core.airstrikeImpactTime(raw,params,weapon,distance);
+    assert(Number.isFinite(implicit));assert.equal(implicit,core.airstrikeImpactTime(raw,{...params,useFixedTimeToAttackPoint:false},weapon,distance));
+  }
+  assert.equal(core.airstrikeImpactTime(raw,{...params,maxPlaneFlightDist:undefined},weapon,1000),null);
+  assert.equal(core.airstrikeImpactTime(raw,{...params,minTimeToAttackPoint:1},weapon,1000),null);
+  assert.equal(core.airstrikeImpactTime(raw,{...params,useFixedTimeToAttackPoint:null},weapon,1000),null);
+  assert.equal(core.airstrikeImpactTime(raw,params,{withParachute:true},1000),null);
+  const fixed={...params,useFixedTimeToAttackPoint:true,minTimeToAttackPoint:1,maxTimeToAttackPoint:4,maxTimeToAttackPointDistance:10000};
+  assert.equal(core.airstrikeImpactTime(raw,fixed,weapon,10000),9);
+  assert.equal(core.inferredAirstrikeTiming(fixed),false);
+});
+
 test('shared metric scale is identical for bomber and airstrike diagrams',()=>{
   const items=defaultDataset.defaults.map(id=>catalog.entries.find(e=>e.id===id)).map(e=>core.analyze(read(e.files[1]),e.aircraft+'.json'));
   const airstrike=items.find(r=>r.kind==='airstrike'),entry=catalog.entries.find(e=>e.aircraft===airstrike.name);

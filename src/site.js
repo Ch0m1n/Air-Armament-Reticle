@@ -205,7 +205,10 @@ async function repositoryJson(file) {
 }
 function attachData(item,weapon,manifests) {
   if(item.kind==='torpedo')attachTorpedoWeapon(item,weapon);
-  if(item.kind==='airstrike'){attachAirstrikeWeapon(item,weapon);item.timingRanges=airstrikeTimingRanges(item,manifests,weapon);}
+  if(item.kind==='airstrike'){
+    attachAirstrikeWeapon(item,weapon);item.timingRanges=airstrikeTimingRanges(item,manifests,weapon);
+    if(item.timingRanges.some(range=>range.inferredMode))item.warnings.push('Source omits useFixedTimeToAttackPoint and fixed-time inputs. Flight time is estimated from the available distance, speed and fall-time inputs using the distance-based approach model.');
+  }
 }
 async function addEntry(id,slot=null) {
   const matches=catalog.entries.filter(e=>(e.id===id||e.legacyId===id)&&catalog.datasets.some(d=>d.id===e.datasetId&&(slot?d.game===slotGame(slot)&&d.version===slot.version:activeGame==='mixed'||d.game===activeGame)));
