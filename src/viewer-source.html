@@ -137,7 +137,7 @@ function parseAircraftJson(text) {
   return {data:JSON.parse(clean),nonFinite};
 }
 function estimatedDirection(r) {
-  if(!positive(r.raw.torpedoAimDist)||!finite(r.raw.minSpread)||r.raw.minSpread<0||!positive(r.spanX))return 'unknown';
+  if(!positive(r.raw.torpedoAimDist)||!finite(r.raw.minSpread)||r.raw.minSpread<0||!finite(r.spanX)||r.spanX<0)return 'unknown';
   const difference=r.raw.minSpread-r.spanX;
   return Math.abs(difference)<1e-9?'parallel':difference<0?'converging':'diverging';
 }
@@ -423,7 +423,7 @@ function torpedoDrawing(r,scale,distanceScale=commonDistance([r]),distanceLimit=
   const widthAtArming=sector?sector.startWidth+2*edgeSlope*(r.armingDistance||0):0;
   const sectorEdges=[{x:140-widthAtArming*scale/2,y:265-(r.armingDistance||0)*scale},{x:140-endWidth*scale/2,y:265-viewDistance*scale},{x:140+endWidth*scale/2,y:265-viewDistance*scale},{x:140+widthAtArming*scale/2,y:265-(r.armingDistance||0)*scale}];
   const area=armed?`<polygon fill="#6ed7ad" fill-opacity=".2" points="${sectorEdges.map(xy).join(' ')}"/><path class="travel" stroke-dasharray="4 3" d="M ${xy(sectorEdges[0])} L ${xy(sectorEdges[3])}"/>`:'';
-  const lines=r.direction==='unknown'||!sector?'':coords.map((p,i)=>`<path class="travel" d="M ${xy(p)} L ${xy(ends[i])}"/>`).join('');
+  const lines=r.direction==='unknown'||!sector?'':coords.map((p,i)=>`<path class="travel" d="M ${xy(p)} L ${xy(ends[i])}"/>${r.spanX===0&&endWidth!==0?`<path class="travel torpedo-single-envelope" d="M ${140-endWidth*scale/2},${ends[i].y} L ${xy(p)} L ${140+endWidth*scale/2},${ends[i].y}"/>`:''}`).join('');
   const dots=coords.map((p,i)=>{
     const n=Math.min(r.perPlane,6);
     return `<g><title>${escapeHtml(JSON.stringify(r.points[i]))}; ${r.perPlane} torpedo(s)</title>${Array.from({length:n},(_,j)=>`<circle cx="${p.x+(j-(n-1)/2)*7}" cy="${p.y}" r="2.7"/>`).join('')}${r.perPlane>6?`<text class="dot-label" x="${p.x}" y="${p.y+15}" text-anchor="middle">×${r.perPlane}</text>`:''}</g>`;

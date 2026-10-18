@@ -271,6 +271,25 @@ test('torpedo sectors use metric widths, equal axes and no heuristic direction t
   assert(core.torpedoDrawing(changed,scaleOther).includes(`data-metric-scale="${scaleOther}"`));
 });
 
+test('single-plane torpedo formations retain their estimated aiming envelope at zero formation width',()=>{
+  const raw={name:'TEST_SINGLE_TORPEDO',typeinfo:{type:'Aircraft'},torpedoName:'TEST_WEAPON',attackerSize:1,projectilesPerAttack:1,attackCount:1,minSpread:10,maxSpread:20,torpedoAimDist:100,formations:{attack:[0.1,[[0,0,0]]]}};
+  const result=core.analyze(raw,'single.json');
+  core.attachTorpedoWeapon(result,{ammoType:'torpedo',maxDist:80,speed:35,armingTime:3});
+  assert.equal(result.spanX,0);assert.equal(result.direction,'diverging');
+  assert.equal(core.torpedoSector(result).aimWidth,300);
+  for(const limit of [1000,2400]){
+    const svg=core.torpedoDrawing(result,core.commonScale([result],limit),result.rangeDistance,limit);
+    assert(svg.includes('torpedo-single-envelope'));assert(svg.includes('<polygon'));
+    assert(!/NaN|Infinity/.test(svg));
+  }
+  const parallel=core.analyze({...raw,minSpread:0},'parallel.json');
+  core.attachTorpedoWeapon(parallel,{ammoType:'torpedo',maxDist:80,speed:35,armingTime:3});
+  assert.equal(parallel.direction,'parallel');
+  const svg=core.torpedoDrawing(parallel,core.commonScale([parallel]));
+  assert(!svg.includes('torpedo-single-envelope'));assert(!/NaN|Infinity/.test(svg));
+  assert.equal(core.estimatedDirection({...result,raw:{...raw,torpedoAimDist:0}}),'unknown');
+});
+
 test('bomber drop previews use selected aiming regions, payload and inner allocation',()=>{
   const entry=catalog.entries.find(entry=>entry.role==='bomb'),plane=read(entry.files[1]);
   const result=core.analyze(plane,plane.name+'.json');
