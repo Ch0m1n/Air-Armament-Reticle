@@ -2,7 +2,7 @@
 
 A static comparison tool for aircraft weapon aiming areas, built for GitHub Pages.
 
-Site: https://ch0m1n.github.io/Air-Armament-Reticle/
+## https://ch0m1n.github.io/Air-Armament-Reticle/
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
 ## Local Development
