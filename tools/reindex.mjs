@@ -22,7 +22,10 @@ for(const [folder,game]of [['WOWS','wows'],['KORABLI','korabli']]) {
     };
     const datasetEntries=[];
     for(const filename of fs.readdirSync(path.join(root,base,'Ships')).filter(name=>name.endsWith('.json')).sort()) {
+      if(/DISABLED|PRESERVED/i.test(filename))continue;
       const shipFile=base+'/Ships/'+filename,ship=read(shipFile),code=ship.name.split('_')[0];
+      if(/DISABLED|PRESERVED/i.test(ship.name))continue;
+      if(['disabled','preserved'].includes(String(ship.group||'').toLowerCase()))continue;
       for(const ref of core.shipManifest(ship,filename).aircraft) {
         const planeFile=fileFor('Aircraft',ref.id);if(!planeFile)continue;
         const plane=read(planeFile);let result;try{result=core.analyze(plane,ref.id+'.json');}catch{continue;}

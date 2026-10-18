@@ -11,15 +11,17 @@ const selectionSources=new Map();let modifierSlotId=null;
 const modifierHelpEntries=new Map();let activeHelpButton=null;
 const nationNames={USA:'U.S.A.',Germany:'Germany',Japan:'Japan',Netherlands:'Netherlands',UK:'U.K.',Russia:'U.S.S.R.'};
 const classNames={AirCarrier:'Aircraft carrier',Battleship:'Battleship',Cruiser:'Cruiser',Destroyer:'Destroyer',Submarine:'Submarine'};
-const gameNames={wows:'World of Warships',korabli:'Korabli'},gameSessions=new Map(),gameVersions=new Map();
+const gameNames={wows:'World of Warships',korabli:'Korabli',mixed:'WoWS-MK'},gameSessions=new Map(),gameVersions=new Map();
+const actualGames=['wows','korabli'],gameLabels={wows:'WoWS',korabli:'Korabli'};
+const slotGame=slot=>slot.game||(activeGame==='mixed'?'korabli':activeGame);
 const activeDataset=()=>catalog?.datasets.find(dataset=>dataset.game===activeGame&&dataset.version===activeVersion);
-const gameEntries=()=>catalog?.entries.filter(entry=>entry.datasetId===activeDataset()?.id)||[];
+const gameEntries=()=>activeGame==='mixed'?catalog?.entries||[]:catalog?.entries.filter(entry=>entry.datasetId===activeDataset()?.id)||[];
 const defaultVersion=game=>catalog?.datasets.find(dataset=>dataset.game===game&&dataset.default)?.version||catalog?.datasets.find(dataset=>dataset.game===game)?.version||'';
 function renderGame() {
   for(const button of document.querySelectorAll('[data-game]'))button.setAttribute('aria-pressed',String(button.dataset.game===activeGame));
   const dataset=activeDataset(),versions=catalog?.datasets.filter(dataset=>dataset.game===activeGame)||[];
-  ui('dataset').textContent=dataset?dataset.dataset:gameNames[activeGame]+' · No bundled dataset';
-  ui('snapshot').textContent=dataset?.snapshot||'Not available';
+  ui('dataset').textContent=activeGame==='mixed'?'WoWS + Korabli':dataset?dataset.dataset:gameNames[activeGame]+' · No bundled dataset';
+  ui('snapshot').textContent=activeGame==='mixed'?'Per-card game / version':dataset?.snapshot||'Not available';
   document.title=gameNames[activeGame]+' · Air Armament Reticle';
 }
 function glyph(name) {
@@ -41,6 +43,7 @@ function notice(message,error=false){ui('status').textContent=message;ui('status
 function setBusy(value) {
   busy=value;ui('results').setAttribute('aria-busy',String(value));
   for(const id of ['open','share','export','clear'])ui(id).disabled=value||(id!=='open'&&!selections.length);
+  if(activeGame==='mixed')ui('open').disabled=true;
   ui('add-ship').disabled=value||!catalog||shipSlots.length>=12;
   for(const button of document.querySelectorAll('[data-game]'))button.disabled=value;
   for(const input of ui('ship-editors').querySelectorAll('input,select,button'))input.disabled=value||input.dataset.empty==='true';
@@ -50,44 +53,49 @@ function renderLibrary() {
   ui('library-count').textContent=shipSlots.length+' / 12';
   ui('ship-editors').innerHTML=shipSlots.map(slot=>{
     const options=slotOptions(slot);
-    const field=(name,label,values,placeholder)=>`<label class="field">${label}<select data-field="${name}" aria-label="${label}" data-empty="${!values.length}"><option value="">${placeholder}</option>${values.map(([value,text])=>`<option value="${escapeHtml(value)}"${slot[name]===value?' selected':''}>${escapeHtml(text)}</option>`).join('')}</select></label>`;
+    const field=(name,label,values,placeholder)=>`<label class="field">${label}<select data-field="${name}" aria-label="${label}" data-empty="${!values.length}"><option value=""${name==='game'?' disabled':''}>${placeholder}</option>${values.map(([value,text])=>`<option value="${escapeHtml(value)}"${slot[name]===value?' selected':''}>${escapeHtml(text)}</option>`).join('')}</select></label>`;
     return `<article class="ship-editor" data-slot="${slot.id}" aria-label="${escapeHtml(slotDisplayName(slot)||'Ship selection')}"><div class="editor-heading"><div><button type="button" class="icon-button" data-slot-action="clone" title="Clone ship" aria-label="Clone ship">${glyph('Copy')}</button><button type="button" class="icon-button" data-slot-action="remove" title="Remove ship" aria-label="Remove ship">${glyph('X')}</button></div></div>
-      <label class="field">Ship name<input type="text" data-field="customName" aria-label="Ship name" maxlength="80" value="${escapeHtml(slotDisplayName(slot))}"></label>
-      ${field('version','Version',catalog.datasets.filter(d=>d.game===activeGame).map(d=>[d.version,d.version]),'Select version')}
+      <label class="field">Ship name<span class="ship-name-value"><input type="text" data-field="customName" aria-label="Ship name" maxlength="80" value="${escapeHtml(slotDisplayName(slot))}">${activeGame==='mixed'?'<span class="ship-game-suffix">('+gameLabels[slotGame(slot)]+')</span>':''}</span></label>
+      ${activeGame==='mixed'?field('game','Game',actualGames.map(game=>[game,gameLabels[game]]),'Select game'):''}
+      ${field('version','Version',catalog.datasets.filter(d=>d.game===slotGame(slot)).map(d=>[d.version,d.version]),'Select version')}
       ${field('nation','Nation',options.nations.map(n=>[n,nationNames[n]||n]),'All nations')}
       ${field('shipClass','Ship type',options.classes.map(n=>[n,classNames[n]||n]),'All ship types')}
-      ${field('ship','Ship',options.ships.map(entry=>[entry.shipId,`${entry.tier??'?'} · ${entry.ship}`]),'Select ship')}
+      ${field('ship','Ship',options.ships.map(entry=>[entry.shipId,`${entry.tier??'?'} · ${entry.ship}${activeGame==='mixed'?' ('+gameLabels[slotGame(slot)]+')':''}`]),'Select ship')}
       <div class="editor-modules"><h4>Aircraft modules</h4>
-      ${field('role','Armament',Object.entries(roleNames),'Select armament')}
+      ${field('role','Armament',options.roles.map(role=>[role,roleNames[role]]),'Select armament')}
       ${field('module','Module',options.modules.map(m=>[m.id,`${m.upgrades[0]?.stage||'Standard'} · ${m.id}`]),'Select module')}
       ${field('entryId','Aircraft',options.aircraft.map(e=>[e.id,e.aircraft]),'Select aircraft')}</div>
       <div class="editor-footer"><button type="button" data-slot-action="modifiers" data-empty="${!slot.entryId}"${slot.entryId?'':' disabled'}>Modifiers</button><span class="editor-status">${Object.keys(slot.modifiers||{}).length?'Modified':slot.entryId?'Original data':'No aircraft selected'}</span></div></article>`;
   }).join('');
   setBusy(busy);
 }
-function newSlot(version=activeVersion){return {id:nextSlot++,version,nation:'',shipClass:'',ship:'',role:'',module:'',entryId:''};}
+function newSlot(version=activeVersion,game=activeGame==='mixed'?'korabli':activeGame){return {id:nextSlot++,game,version:version||defaultVersion(game),nation:'',shipClass:'',ship:'',role:'',module:'',entryId:''};}
 function slotOptions(slot) {
-  const base=catalog.entries.filter(e=>e.datasetId===activeGame+':'+slot.version);
+  const base=catalog.entries.filter(e=>e.datasetId===slotGame(slot)+':'+slot.version);
   const nations=[...new Set(base.map(e=>e.nation))].sort();
   const national=base.filter(e=>!slot.nation||e.nation===slot.nation);
   const classes=[...new Set(national.map(e=>e.shipClass))].sort();
   const filtered=national.filter(e=>!slot.shipClass||e.shipClass===slot.shipClass);
-  const ships=[...new Map(filtered.map(e=>[e.shipId,e])).values()].sort((a,b)=>a.ship.localeCompare(b.ship));
-  const candidates=filtered.filter(e=>e.shipId===slot.ship&&e.role===slot.role);
+  const ships=[...new Map(filtered.map(e=>[e.shipId,e])).values()].sort((a,b)=>(a.tier??Infinity)-(b.tier??Infinity)||a.ship.localeCompare(b.ship,undefined,{numeric:true})||a.shipId.localeCompare(b.shipId));
+  const shipEntries=filtered.filter(e=>e.shipId===slot.ship);
+  const roles=Object.keys(roleNames).filter(role=>shipEntries.some(e=>e.role===role));
+  const candidates=shipEntries.filter(e=>e.role===slot.role);
   const modules=[...new Map(candidates.flatMap(e=>e.modules||[]).map(m=>[m.id,m])).values()].sort((a,b)=>(a.upgrades[0]?.order||0)-(b.upgrades[0]?.order||0)||a.id.localeCompare(b.id));
-  return {nations,classes,ships,modules,aircraft:candidates.filter(e=>!slot.module||e.modules?.some(m=>m.id===slot.module))};
+  return {nations,classes,ships,roles,modules,aircraft:candidates.filter(e=>!slot.module||e.modules?.some(m=>m.id===slot.module))};
 }
 function slotFromEntry(entry) {
-  const dataset=catalog.datasets.find(d=>d.id===entry.datasetId),slot=newSlot(dataset.version);
+  const dataset=catalog.datasets.find(d=>d.id===entry.datasetId),slot=newSlot(dataset.version,dataset.game);
   Object.assign(slot,{nation:entry.nation,shipClass:entry.shipClass,ship:entry.shipId,role:entry.role,module:entry.modules?.[0]?.id||'',entryId:entry.id});return slot;
 }
-function slotDisplayName(slot){return slot.customName||catalog.entries.find(entry=>entry.shipId===slot.ship&&entry.datasetId===activeGame+':'+slot.version)?.ship||'';}
-function comparisonShipLabel(slot){return `${slotDisplayName(slot)}${Object.keys(slot.modifiers||{}).length?' (Modified)':''}`;}
+function slotDisplayName(slot){return slot.customName||catalog.entries.find(entry=>entry.shipId===slot.ship&&entry.datasetId===slotGame(slot)+':'+slot.version)?.ship||'';}
+function comparisonShipLabel(slot){return `${slotDisplayName(slot)}${activeGame==='mixed'?' ('+gameLabels[slotGame(slot)]+')':''}${Object.keys(slot.modifiers||{}).length?' (Modified)':''}`;}
+function defaultEntries(){return activeGame==='mixed'?actualGames.flatMap(game=>catalog.datasets.find(dataset=>dataset.game===game&&dataset.version===defaultVersion(game))?.defaults||[]).slice(0,12):activeDataset()?.defaults||[];}
 const dimension=value=>value?`${Number(value.width.toFixed(1))} × ${Number(value.height.toFixed(1))} m`:'N/A';
 function comparisonMetrics(item) {
-  if(item.kind==='bomb')return [['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
-  if(item.kind==='torpedo')return [['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation rows',item.rows]];
-  return [['Drop area',dimension(item.outer)],['Inner region',dimension(item.inner)],...airstrikeTimingRows(item),['Bombs per attack',item.payload?.count??'N/A'],['Release interval',item.raw.attackInterval+' s']];
+  const source=activeGame==='mixed'&&item.version?[['Version',item.version]]:[];
+  if(item.kind==='bomb')return [...source,['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
+  if(item.kind==='torpedo')return [...source,['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation rows',item.rows]];
+  return [...source,['Drop area',dimension(item.outer)],['Inner region',dimension(item.inner)],...airstrikeTimingRows(item),['Bombs per attack',item.payload?.count??'N/A'],['Release interval',item.raw.attackInterval+' s']];
 }
 function sourceData(item) {
   if(item.files)return item.files.map(file=>{
@@ -156,7 +164,8 @@ function attachData(item,weapon,manifests) {
   if(item.kind==='airstrike'){attachAirstrikeWeapon(item,weapon);item.timingRanges=airstrikeTimingRanges(item,manifests,weapon);}
 }
 async function addEntry(id,slot=null) {
-  const entry=catalog.entries.find(e=>(e.id===id||e.legacyId===id)&&catalog.datasets.some(d=>d.id===e.datasetId&&d.game===activeGame));if(!entry)throw Error('Aircraft not found for '+gameNames[activeGame]);
+  const matches=catalog.entries.filter(e=>(e.id===id||e.legacyId===id)&&catalog.datasets.some(d=>d.id===e.datasetId&&(slot?d.game===slotGame(slot)&&d.version===slot.version:activeGame==='mixed'||d.game===activeGame)));
+  if(matches.length!==1)throw Error('Aircraft not found or ambiguous for '+gameNames[activeGame]);const entry=matches[0];
   const old=slot&&selections.find(item=>item.slotId===slot.id);
   if(!old&&selections.length>=12)throw Error('Comparison limit reached (12).');
   const [ship,plane,weapon]=await Promise.all(entry.files.map(repositoryJson));
@@ -169,6 +178,7 @@ async function addEntry(id,slot=null) {
   if(!slot){slot=slotFromEntry(entry);shipSlots.push(slot);}
   slot.modifiers=modified.overrides;
   Object.assign(item,{id:old?.id||nextSelection++,slotId:slot.id,catalogId:entry.id,shipLabel:comparisonShipLabel(slot),files:entry.files,reference:old?.reference??true});
+  item.game=slotGame(slot);item.version=slot.version;
   slot.entryId=entry.id;
   slot.modifiers=modified.overrides;item.modifiers=modified.overrides;
   if(Object.keys(item.modifiers).length)item.warnings.push('User-modified calculation inputs; not original game data.');
@@ -185,7 +195,7 @@ async function switchDataset(game,version) {
   for(const [map,values]of [[uploadedShips,saved?.ships],[uploadedAircraft,saved?.aircraft],[uploadedWeapons,saved?.weapons]]){map.clear();for(const [key,value]of values||[])map.set(key,value);}
   comparisonRole=saved?.comparisonRole||'bomb';
   renderGame();renderLibrary();setBusy(true);
-  try{if(!saved)for(const id of activeDataset()?.defaults||[])await addEntry(id);notice('');}catch(error){notice(error.message,true);}
+  try{if(!saved)for(const id of defaultEntries())await addEntry(id);notice('');}catch(error){notice(error.message,true);}
   finally{
     if(!shipSlots.length)shipSlots.push(newSlot());
     setBusy(false);renderLibrary();renderComparison();
@@ -222,12 +232,13 @@ ui('ship-editors').addEventListener('change',async event=>{
     input.value=slotDisplayName(slot);renderComparison();return;
   }
   const snapshot={...slot},field=input.dataset.field;slot[field]=input.value;
-  if(['version','nation','shipClass','ship'].includes(field))slot.customName='';
+  if(['game','version','nation','shipClass','ship'].includes(field))slot.customName='';
   slot.modifiers={};
-  const fields=['version','nation','shipClass','ship','role','module','entryId'];
+  const fields=['game','version','nation','shipClass','ship','role','module','entryId'];
   for(const key of fields.slice(fields.indexOf(field)+1))slot[key]='';
+  if(field==='game')slot.version=defaultVersion(slotGame(slot));
   if(slot.ship){
-    const entries=catalog.entries.filter(e=>e.datasetId===activeGame+':'+slot.version&&e.shipId===slot.ship);
+    const entries=catalog.entries.filter(e=>e.datasetId===slotGame(slot)+':'+slot.version&&e.shipId===slot.ship);
     if(!slot.role)slot.role=entries[0]?.role||'';
     if(!slot.module)slot.module=slotOptions(slot).modules[0]?.id||'';
     if(!slot.entryId)slot.entryId=slotOptions(slot).aircraft[0]?.id||'';
@@ -242,7 +253,7 @@ ui('ship-editors').addEventListener('change',async event=>{
 });
 function openModifiers(slot) {
   const item=selections.find(item=>item.slotId===slot.id),source=item&&selectionSources.get(item.id);if(!source)return;
-  modifierSlotId=slot.id;ui('modifiers-title').textContent=`${slotDisplayName(slot)} · Modifiers`;
+  modifierSlotId=slot.id;ui('modifiers-title').textContent=`${comparisonShipLabel(slot)} · Modifiers`;
   hideModifierHelp();modifierHelpEntries.clear();
   ui('modifier-error').textContent='';
   ui('modifier-fields').innerHTML='<div class="modifier-columns" aria-hidden="true"><span>Parameter</span><span>Original</span><span>Value</span><span></span></div>'+modifierFields(item.kind,source.plane,source.weapon).map(field=>{
@@ -329,7 +340,7 @@ ui('share').addEventListener('click',async()=>{
     url.searchParams.set('game',activeGame);
     url.searchParams.set('version',activeVersion);
     url.searchParams.set('type',comparisonRole);
-    url.searchParams.set('slots',JSON.stringify(shipSlots.map(({version,entryId,nation,shipClass,ship,role,module,modifiers,customName})=>({version,entryId,nation,shipClass,ship,role,module,modifiers,customName}))));
+    url.searchParams.set('slots',JSON.stringify(shipSlots.map(({game,version,entryId,nation,shipClass,ship,role,module,modifiers,customName})=>({game,version,entryId,nation,shipClass,ship,role,module,modifiers,customName}))));
     if(!cardView)url.searchParams.set('view','list');if(!sharedScale)url.searchParams.set('scale','independent');
     await navigator.clipboard.writeText(url.href);notice('Comparison link copied.');
   }catch(error){notice(error.message||'Clipboard unavailable.',true);}
@@ -343,6 +354,7 @@ ui('open').addEventListener('click',()=>ui('import-dialog').showModal());ui('bro
 ui('notes').addEventListener('click',()=>ui('notes-dialog').showModal());
 for(const button of document.querySelectorAll('[data-close]'))button.addEventListener('click',()=>ui(button.dataset.close).close());
 async function importFiles(list) {
+  if(activeGame==='mixed'){notice('Import JSON in a single-game tab.',true);return;}
   if(busy)return;setBusy(true);const messages=[];
   try {
     for(const file of Array.from(list).slice(0,32)) {
@@ -380,7 +392,7 @@ for(const name of ['dragover','dragleave','drop'])ui('drop').addEventListener(na
     const response=await fetch(siteCatalogUrl);if(!response.ok)throw Error('Could not load aircraft catalog');catalog=await response.json();
     if(catalog.schema!==2||!Array.isArray(catalog.entries)||!Array.isArray(catalog.datasets))throw Error('Unsupported catalog');
     const initial=catalog.datasets.find(dataset=>dataset.id===catalog.defaultDataset),query=new URLSearchParams(location.search);
-    activeGame=Object.hasOwn(gameNames,query.get('game'))?query.get('game'):initial?.game||'korabli';activeVersion=query.get('version')||defaultVersion(activeGame);
+    activeGame=Object.hasOwn(gameNames,query.get('game'))?query.get('game'):initial?.game||'korabli';activeVersion=activeGame==='mixed'?'':query.get('version')||defaultVersion(activeGame);
     comparisonRole=Object.hasOwn(roleNames,query.get('type'))?query.get('type'):'bomb';
     renderGame();renderLibrary();
     cardView=query.get('view')!=='list';sharedScale=query.get('scale')!=='independent';ui('shared-scale').checked=sharedScale;
@@ -388,14 +400,15 @@ for(const name of ['dragover','dragleave','drop'])ui('drop').addEventListener(na
       const slots=JSON.parse(query.get('slots'));if(!Array.isArray(slots)||slots.length>12)throw Error('Invalid ship slots');
       for(const value of slots){
         if(value.entryId){
-          const entry=catalog.entries.find(e=>e.id===value.entryId&&catalog.datasets.some(d=>d.id===e.datasetId&&d.game===activeGame));if(!entry)throw Error('Invalid shared aircraft');
+          const entry=catalog.entries.find(e=>e.id===value.entryId&&catalog.datasets.some(d=>d.id===e.datasetId&&(activeGame==='mixed'||d.game===activeGame)));if(!entry)throw Error('Invalid shared aircraft');
+          const dataset=catalog.datasets.find(d=>d.id===entry.datasetId);if(value.game&&value.game!==dataset.game)throw Error('Shared game does not match aircraft');
           const slot=slotFromEntry(entry);slot.modifiers=value.modifiers||{};slot.customName=typeof value.customName==='string'?value.customName.trim().slice(0,80):'';
           await addEntry(value.entryId,slot);shipSlots.push(slot);continue;
         }
-        const slot=newSlot();for(const key of ['version','nation','shipClass','ship','role','module'])if(typeof value[key]==='string')slot[key]=value[key];slot.customName=typeof value.customName==='string'?value.customName.trim().slice(0,80):'';shipSlots.push(slot);
+        const slot=newSlot();if(value.game){if(!actualGames.includes(value.game)||activeGame!=='mixed'&&value.game!==activeGame)throw Error('Invalid shared game');slot.game=value.game;}for(const key of ['version','nation','shipClass','ship','role','module'])if(typeof value[key]==='string')slot[key]=value[key];slot.customName=typeof value.customName==='string'?value.customName.trim().slice(0,80):'';shipSlots.push(slot);
       }
     }else {
-      const ids=query.has('aircraft')?query.get('aircraft').split(',').filter(Boolean).slice(0,12):activeDataset()?.defaults||[];
+      const ids=query.has('aircraft')?query.get('aircraft').split(',').filter(Boolean).slice(0,12):defaultEntries();
       for(const id of ids)await addEntry(id);
     }
     if(!shipSlots.length)shipSlots.push(newSlot());notice('');

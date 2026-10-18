@@ -44,10 +44,30 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     fs.cpSync(path.join(root,'src'),path.join(fixture,'src'),{recursive:true});fs.mkdirSync(path.join(fixture,'tools'));
     for(const name of ['build.mjs','reindex.mjs','preview.mjs'])fs.copyFileSync(path.join(root,'tools',name),path.join(fixture,'tools',name));
     const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version);
+    const wowsBombPath=path.join(fixture,'GAME/WOWS/fixture-A/Aircraft/TEST_BOMBER.json');
+    const wowsBomb=JSON.parse(fs.readFileSync(wowsBombPath));wowsBomb.outerSalvoSize[0]=3;fs.writeFileSync(wowsBombPath,JSON.stringify(wowsBomb));
     for(const tool of ['reindex.mjs','build.mjs']){const result=spawnSync(process.execPath,[path.join(fixture,'tools',tool)],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
     const origin=await serve(fixture);await page.goto(origin+'?game=korabli&version=fixture-A');await page.waitForFunction(()=>!busy&&selections.length===3);
     assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),5);
     const first=page.locator('.ship-editor').first(),second=page.locator('.ship-editor').nth(1);
+    assert.deepEqual(await page.evaluate(()=>{
+      const saved=catalog.entries,slot=shipSlots[0];
+      try{
+        catalog.entries=saved.filter(e=>e.datasetId!==slotGame(slot)+':'+slot.version||e.shipId!==slot.ship||e.role==='bomb');
+        renderLibrary();
+        const values=[...document.querySelector(`[data-slot="${slot.id}"] [data-field="role"]`).options].map(o=>o.value);
+        if(slotOptions({...slot,ship:''}).roles.length)throw Error('Unselected ship exposes armament');
+        return values;
+      }finally{catalog.entries=saved;renderLibrary();}
+    }),['','bomb']);
+    assert.deepEqual(await first.locator('[data-field="role"] option').evaluateAll(options=>options.map(o=>o.value)),['','bomb','torpedo','airstrike']);
+    assert.deepEqual(await page.evaluate(()=>{
+      const saved=catalog.entries;
+      try{
+        catalog.entries=[{shipId:'Z',ship:'Zulu',tier:4},{shipId:'B',ship:'Beta',tier:8},{shipId:'A',ship:'Alpha',tier:8},{shipId:'X',ship:'Aardvark',tier:10}].map(e=>({...e,datasetId:'korabli:fixture-A'}));
+        return slotOptions({game:'korabli',version:'fixture-A'}).ships.map(e=>e.shipId);
+      }finally{catalog.entries=saved;}
+    }),['Z','A','B','X']);
     await first.locator('[data-field="version"]').selectOption('fixture-B');await page.waitForFunction(()=>!busy&&selections.length===2);
     await first.locator('[data-field="ship"]').selectOption('TST001_Synthetic_Carrier');await page.waitForFunction(()=>!busy&&selections.length===3);
     assert.equal(await second.locator('[data-field="version"]').inputValue(),'fixture-A');
@@ -69,7 +89,32 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.locator('#clear').click();assert.equal(await page.locator('#results article').count(),0);
     const catalog=JSON.parse(fs.readFileSync(path.join(fixture,'GAME/catalog.json'))),entry=catalog.entries.find(e=>e.role==='bomb');await page.locator('#open').click();await page.locator('#files').setInputFiles(entry.files.map(file=>path.join(fixture,file)));await page.waitForFunction(()=>!busy&&selections.length===1);
     await page.locator('#share').click();assert((await page.locator('#status').innerText()).includes('Uploaded JSON'));const download=page.waitForEvent('download');await page.locator('#export').click();await(await download).saveAs(path.join(artifacts,'results.json'));
-    assert.deepEqual(errors,[]);console.log('PASS empty production site; isolated synthetic comparison, modifiers, share, mobile and import tests');
+    await page.goto(origin+'?game=mixed&type=bomb');await page.waitForFunction(()=>!busy&&selections.length===6);
+    assert.equal(await page.locator('.ship-editor [data-field="game"]').count(),6);
+    assert((await page.locator('#comparison-bomb').innerText()).includes('Synthetic Carrier (WoWS)'));
+    assert((await page.locator('#comparison-bomb').innerText()).includes('Synthetic Carrier (Korabli)'));
+    const widths=await page.evaluate(()=>selections.filter(item=>item.kind==='bomb').map(item=>[item.game,item.outer.width]));
+    assert.deepEqual(widths,[['wows',180],['korabli',120]]);
+    assert(await page.evaluate(()=>selections.every(item=>item.files.every(file=>file.startsWith('GAME/'+(item.game==='wows'?'WOWS':'KORABLI')+'/'+item.version+'/')))));
+    const scales=await page.locator('#comparison-bomb [data-metric-scale]').evaluateAll(nodes=>nodes.map(node=>node.dataset.metricScale));assert.equal(scales.length,2);assert.equal(new Set(scales).size,1);
+    await first.locator('[data-field="game"]').selectOption('korabli');await page.waitForFunction(()=>!busy&&selections.length===5);
+    await first.locator('[data-field="ship"]').selectOption('TST001_Synthetic_Carrier');await page.waitForFunction(()=>!busy&&selections.length===6);
+    assert.equal(await page.evaluate(()=>selections.find(item=>item.slotId===shipSlots[0].id).outer.width),120);
+    await first.locator('[data-field="game"]').selectOption('wows');await page.waitForFunction(()=>!busy&&selections.length===5);
+    await first.locator('[data-field="ship"]').selectOption('TST001_Synthetic_Carrier');await page.waitForFunction(()=>!busy&&selections.length===6);
+    await first.getByRole('textbox',{name:'Ship name',exact:true}).fill('Cross-game test');await first.getByRole('textbox',{name:'Ship name',exact:true}).press('Tab');
+    assert((await page.locator('#comparison-bomb').innerText()).includes('Cross-game test (WoWS)'));
+    await page.locator('#share').click();const mixedLink=await page.evaluate(()=>navigator.clipboard.readText());assert(mixedLink.includes('game=mixed'));
+    await page.goto(mixedLink);await page.waitForFunction(()=>!busy&&selections.length===6);
+    assert.equal(await first.locator('[data-field="game"]').inputValue(),'wows');
+    assert.equal(await page.evaluate(()=>selections.find(item=>item.slotId===shipSlots[0].id).outer.width),180);
+    await page.locator('[data-game="korabli"]').click();await page.waitForFunction(()=>!busy&&activeGame==='korabli');
+    assert.equal(await page.locator('.ship-editor [data-field="game"]').count(),0);
+    await page.locator('[data-game="mixed"]').click();await page.waitForFunction(()=>!busy&&selections.length===6);
+    assert.equal(await first.getByRole('textbox',{name:'Ship name',exact:true}).inputValue(),'Cross-game test');
+    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:path.join(artifacts,'mixed-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(artifacts,'mixed-mobile.png'),fullPage:true});
+    assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import and responsive tests');
   }finally{
     if(browser)await browser.close();
     for(const server of servers)if(server.exitCode===null){const stopped=new Promise(resolve=>server.once('exit',resolve));server.kill();await stopped;}

@@ -13,6 +13,12 @@ const dataRoot=fs.mkdtempSync(path.join(artifactRoot,'synthetic-core-'));
 for(const folder of ['src','tools'])fs.mkdirSync(path.join(dataRoot,folder));
 for(const file of ['src/viewer-source.html','tools/reindex.mjs'])fs.copyFileSync(path.join(root,file),path.join(dataRoot,file));
 writeFixtureDataset(dataRoot);
+fs.writeFileSync(path.join(dataRoot,'GAME/KORABLI/fixture-A/Ships/TEST_DISABLED_Carrier.json'),'invalid excluded data');
+fs.writeFileSync(path.join(dataRoot,'GAME/KORABLI/fixture-A/Ships/TEST_preserved_Carrier.json'),'invalid excluded data');
+for(const group of ['disabled','preserved']){
+  const name='TEST_GROUP_'+(group==='disabled'?'A':'B');
+  fs.writeFileSync(path.join(dataRoot,'GAME/KORABLI/fixture-A/Ships',name+'.json'),JSON.stringify({name,group,typeinfo:{type:'Ship'},planes:['MISSING']}));
+}
 const indexed=spawnSync(process.execPath,[path.join(dataRoot,'tools/reindex.mjs')],{encoding:'utf8'});assert.equal(indexed.status,0,indexed.stderr);
 const catalog=JSON.parse(fs.readFileSync(path.join(dataRoot,'GAME/catalog.json'),'utf8'));
 after(()=>{if(!dataRoot.startsWith(artifactRoot+path.sep))throw Error('Invalid fixture cleanup');fs.rmSync(dataRoot,{recursive:true,force:true});});
@@ -30,6 +36,9 @@ test('published catalog supports an empty skeleton without test data',()=>{
 });
 test('catalog paths, identities, hashes and default references are complete',()=>{
   assert.equal(catalog.schema,2);assert(catalog.entries.length>0);
+  assert(!catalog.entries.some(entry=>/DISABLED|PRESERVED/i.test(entry.shipId)));
+  assert(!Object.keys(catalog.hashes).some(file=>/DISABLED|PRESERVED/i.test(file)));
+  assert(!catalog.entries.some(entry=>entry.shipId.startsWith('TEST_GROUP_')));
   assert(['korabli','wows'].includes(defaultDataset.game));assert.match(defaultDataset.version,/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
   assert.equal(new Set(catalog.entries.map(e=>e.id)).size,catalog.entries.length);
   for(const dataset of catalog.datasets)for(const id of dataset.defaults)assert(catalog.entries.some(e=>e.id===id&&e.datasetId===dataset.id));

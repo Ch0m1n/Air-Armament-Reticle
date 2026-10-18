@@ -22,6 +22,7 @@ dialog{width:min(520px,calc(100% - 32px));max-height:85vh;overflow:auto;border:1
 .ship-editor .field{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;align-items:center;margin:8px 0}
 .ship-editor select{height:35px;min-width:0;width:100%;padding:5px;font-size:11px}
 .ship-editor input[type="text"]{height:35px;min-width:0;width:100%;padding:5px;font-size:11px}
+.ship-name-value{display:flex;align-items:center;gap:5px;min-width:0}.ship-name-value input{flex:1;min-width:0}.ship-game-suffix{font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
 .editor-modules{border-top:1px solid var(--line);margin-top:14px;padding-top:10px}.editor-modules h4{font-size:12px;font-weight:550;margin-bottom:10px}
 .editor-status{font-size:10px;color:var(--muted);margin-top:12px;min-height:14px}
 .add-ship{display:flex;justify-content:center;width:min(100%,600px);margin:16px auto 0}

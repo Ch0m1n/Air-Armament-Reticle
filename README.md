@@ -46,6 +46,7 @@ The importer accepts singular `Ship`/`Projectile` source folders as well as plur
 ## Interface
 
 - Select World of Warships or Korabli in the header.
+- **WoWS-MK** compares both games in one workspace. Each ship editor has its own Game and Version selectors; name suffixes such as `(WoWS)` and `(Korabli)` identify the source. Identical internal IDs remain isolated by game/version, including in shared links. Same scale still applies within each armament type. Single-game tabs keep their existing separate sessions. Local JSON import remains available in single-game tabs only, where its game context is unambiguous.
 - Light mode is the default; the header theme control switches to dark mode and remembers the preference locally.
 - **Add Ship** creates independent editors (up to 12), each with version, nation, type, ship, armament, research module and aircraft selectors.
 - Editable ship labels, clone/remove controls and per-editor Modifiers support variant comparisons. Original values and help tooltips are provided; reset restores original inputs.
@@ -56,16 +57,22 @@ The importer accepts singular `Ship`/`Projectile` source folders as well as plur
 
 ## Windows Data Publisher
 
-Double-click **Data-Publisher.cmd**. Requires PowerShell 7, Node.js 22+, Git and an authenticated GitHub CLI (`gh auth login --hostname github.com`). The repository destination is fixed to `Ch0m1n/Air-Armament-Reticle`.
+Double-click **Data-Publisher.exe** after building the Windows launcher with `pwsh -NoLogo -NoProfile -File tools/build-publisher.ps1`. **Data-Publisher.cmd** remains a fallback. The EXE opens the existing GUI without a console; keep it beside the `tools` and `src` folders, not by itself. Requires PowerShell 7, Node.js 22+, Git and an authenticated GitHub CLI (`gh auth login --hostname github.com`). The repository destination is fixed to `Ch0m1n/Air-Armament-Reticle`.
 
-1. Browse to the WoWS and Korabli extracted JSON roots once. Settings stay in `%LOCALAPPDATA%/WoWS-Korabli-Air-Armament-Reticle/publisher-settings.json`, outside the repository.
-2. Select the game and enter a version name. A source root can contain the three data folders directly, or contain version subfolders; `15.10` can resolve a `1510` subfolder.
-3. **Preview files** validates references and shows the resolved source, destination, file counts, size and skipped references. Nothing is uploaded.
+1. Browse to the WoWS and Korabli extracted JSON roots once. Both paths, the selected game and version are restored on the next launch. Typed edits auto-save after a short pause; the folder picker starts at the field's current folder or the last browsed folder. Settings stay in `%LOCALAPPDATA%/WoWS-Korabli-Air-Armament-Reticle/publisher-settings.json`, outside the repository, with a previous-settings backup.
+2. Select `WOWS`, `KORABLI`, or `BOTH` and enter the corresponding game versions in the separate WoWS/Korabli fields. `BOTH` scans both sources sequentially, reports progress/ETA for the current game, previews combined totals and both destinations, then uploads both datasets in one commit/push. Both previews must succeed and match the upload-time recheck; either failure blocks the entire upload. Game-specific versions and the mode are remembered. A source root can contain the three data folders directly, or contain version subfolders; `15.10` can resolve a `1510` subfolder.
+3. **Preview files** validates references and shows the resolved source, destination, file counts, size and skipped references. During scanning, it displays completed/total ships, percentage and estimated remaining scan time. Estimates fluctuate with file size and disk speed; repository download, validation and upload show their current stage without a fabricated ETA. Nothing is uploaded during preview.
 4. **Upload to GitHub** asks for public-upload confirmation. An existing target version is refused unless **Replace existing version** is enabled.
 
 Only supported linked ships/aircraft/projectiles are selected. ASW/DC and currently unsupported geometry are excluded. No unrelated directories, path settings or credentials are copied. The uploader works in a disposable clone, runs index/tests/build, stages only `GAME/<game>/<version>/`, and performs a normal non-force push. Other versions and your working checkout are not modified. Preview hashes block unnoticed source changes. Failed pushes preserve the committed recovery checkout; successful updates trigger the existing Pages workflow. This program does not wait for the Pages deploy to finish.
 
+Eligibility is per usable aircraft/weapon connection, not a ship-name allowlist. Ships with no supported aviation or only ASW airstrikes are omitted. Ships that combine HE airstrikes and ASW are retained, but their DC aircraft/projectiles are not uploaded. Carrier/hybrid strike aircraft are also eligible when supported. Preview lists included and excluded ships and counts ASW-only exclusions and mixed-weapon ships retained. Input `Ship` and `Projectile` are accepted; repository folders remain the established plural `Ships` and `Projectiles`.
+
 ## Tests
+
+Publisher **Scan workers** selects 1 (sequential), 2 (default), or 4 parallel workers and remembers the selection. Both mode processes games sequentially using that bounded worker count within each game. Each scan/recheck reads source files anew; no persistent scan-result cache is used. Worker results merge deterministically and shared-file content disagreements abort the scan. Disk speed, dataset size and worker startup overhead affect performance. CLI accepts `--workers 1|2|4` (without the option it uses up to 4 CPU workers). Runtime files must include `tools/publisher-scan-worker.mjs` alongside the publisher backend.
+
+Ship selectors sort by ascending tier, then name. Ships whose JSON `group` is `disabled` or `preserved`, or whose filenames/codes contain those markers (case-insensitive), are excluded from publisher selection and catalog indexing. To remove them from an already published dataset, preview and upload that version again with **Replace existing version** enabled.
 
 `npm test` uses invented values generated in ignored temporary directories. No real game dataset is needed or embedded in fixtures. Tests cover index isolation, research links, calculations, modifier validation and empty catalogs.
 
