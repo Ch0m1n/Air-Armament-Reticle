@@ -20,6 +20,8 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.reload();await page.waitForFunction(()=>!busy);assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
     await page.screenshot({path:path.join(artifacts,'empty-dark.png'),fullPage:true});
     await page.locator('#theme-toggle').click();
+    assert.equal(await page.locator('[role="tab"]').count(),0);
+    await page.evaluate(()=>{selections.push({id:9999,kind:'skip'});renderComparison();});
     for(const kind of ['skip']){
       await page.locator('#comparison-tab-'+kind).click();
       const panel=page.locator('#comparison-'+kind);assert((await panel.innerText()).includes('Under the Maintenance!'));
@@ -36,6 +38,8 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
     await animation.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(artifacts,'maintenance-dark-mobile.png')});
     await page.locator('#theme-toggle').click();await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>{selections.splice(0,selections.length);renderComparison();});
+    assert.equal(await page.locator('[role="tab"]').count(),0);
     assert.equal(await page.locator('#results article').count(),0);assert.equal(await page.locator('.ship-editor').count(),1);
     assert((await page.locator('#dataset').innerText()).includes('No bundled dataset'));await page.locator('#add-ship').click();assert.equal(await page.locator('.ship-editor').count(),2);
     await page.locator('[data-game="wows"]').click();await page.waitForFunction(()=>!busy&&activeGame==='wows');assert(await page.locator('.ship-editor [data-field="ship"]').isDisabled());
@@ -47,8 +51,22 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     const wowsBombPath=path.join(fixture,'GAME/WOWS/fixture-A/Aircraft/TEST_BOMBER.json');
     const wowsBomb=JSON.parse(fs.readFileSync(wowsBombPath));wowsBomb.outerSalvoSize[0]=3;fs.writeFileSync(wowsBombPath,JSON.stringify(wowsBomb));
     for(const tool of ['reindex.mjs','build.mjs']){const result=spawnSync(process.execPath,[path.join(fixture,'tools',tool)],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
-    const origin=await serve(fixture);await page.goto(origin+'?game=korabli&version=fixture-A');await page.waitForFunction(()=>!busy&&selections.length===3);
-    assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),5);
+    const origin=await serve(fixture);await page.goto(origin+'?game=korabli&version=fixture-A&type=attack');await page.waitForFunction(()=>!busy&&selections.length===3);
+    assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),3);
+    const tabKinds=()=>page.locator('[data-comparison-tab]').evaluateAll(tabs=>tabs.map(tab=>tab.dataset.comparisonTab));
+    assert.deepEqual(await tabKinds(),['bomb','torpedo','airstrike']);
+    assert.equal(new URL(page.url()).searchParams.get('type'),'bomb');
+    await page.locator('#comparison-tab-bomb').focus();await page.keyboard.press('ArrowLeft');
+    assert.equal(await page.locator('[role="tab"][aria-selected="true"]').getAttribute('data-comparison-tab'),'airstrike');
+    await page.keyboard.press('Home');
+    assert.equal(await page.locator('[role="tab"][aria-selected="true"]').getAttribute('data-comparison-tab'),'bomb');
+    await page.evaluate(()=>{window.tabTestItems=selections.slice();const bomb=selections.find(r=>r.kind==='bomb');selections.push({...bomb,id:9998,slotId:null,kind:'attack'},{id:9999,kind:'skip'});renderComparison();});
+    assert.deepEqual(await tabKinds(),['attack','bomb','torpedo','skip','airstrike']);
+    await page.locator('#comparison-tab-attack').click();
+    await page.locator('#comparison-attack [data-action="remove"]').click();
+    assert.deepEqual(await tabKinds(),['bomb','torpedo','skip','airstrike']);
+    assert.equal(await page.locator('[role="tab"][aria-selected="true"]').getAttribute('data-comparison-tab'),'bomb');
+    await page.evaluate(()=>{selections.splice(0,selections.length,...window.tabTestItems);delete window.tabTestItems;renderComparison();});
     const first=page.locator('.ship-editor').first(),second=page.locator('.ship-editor').nth(1);
     const bomber=page.locator('#comparison-bomb article').first();
     assert((await bomber.boundingBox()).width>=360);

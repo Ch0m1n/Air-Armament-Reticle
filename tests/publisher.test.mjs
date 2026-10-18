@@ -4,13 +4,45 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {writeFixtureDataset} from './fixtures.mjs';
-import {collectDataset,collectDatasetParallel,collectBatch,writeDataset,publishDataset,repository} from '../tools/data-publisher.mjs';
+import {collectDataset,collectDatasetParallel,collectBatch,writeDataset,publishDataset,repository,createProgressWriter} from '../tools/data-publisher.mjs';
 const project=path.resolve(import.meta.dirname,'..'),parent=path.join(project,'test-artifacts');fs.mkdirSync(parent,{recursive:true});
 const temporary=fs.mkdtempSync(path.join(parent,'publisher-fixture-'));
 after(()=>{if(!temporary.startsWith(parent+path.sep))throw Error('Invalid cleanup path');fs.rmSync(temporary,{recursive:true,force:true});});
 function sourceFixture(name){const folder=path.join(temporary,name);writeFixtureDataset(folder);return path.join(folder,'GAME/KORABLI/fixture-A');}
 const input=sourceFixture('input');
 const options={source:input,game:'KORABLI',version:'1.0-test'};
+
+test('progress snapshots tolerate write/replace locks, retain complete JSON and recover after unlocking',()=>{
+  const file=path.join(temporary,'locked-progress.json');
+  fs.writeFileSync(file,JSON.stringify({phase:'scan',completed:0,total:10}));
+  let time=0,failAt='rename';
+  const io={writeFileSync(...args){if(failAt==='write')throw Object.assign(Error('locked'),{code:'EBUSY'});fs.writeFileSync(...args);},renameSync(...args){if(failAt==='rename')throw Object.assign(Error('locked'),{code:'EPERM'});fs.renameSync(...args);},unlinkSync:fs.unlinkSync};
+  const write=createProgressWriter(file,{io,now:()=>time});
+  assert.equal(write({phase:'scan',completed:1,total:10}),false);
+  assert.equal(JSON.parse(fs.readFileSync(file)).completed,0);
+  assert(!fs.existsSync(file+'.'+process.pid+'.tmp'));
+  time=250;failAt='write';assert.equal(write({phase:'scan',completed:2,total:10}),false);
+  time=500;failAt=null;assert.equal(write({phase:'scan',completed:3,total:10}),true);
+  assert.equal(JSON.parse(fs.readFileSync(file)).completed,3);
+  time=501;assert.equal(write({phase:'scan',completed:4,total:10}),false);
+  assert.equal(write({phase:'scan',completed:10,total:10}),true);
+  assert.equal(write({phase:'finalize'}),true);assert.equal(JSON.parse(fs.readFileSync(file)).phase,'finalize');
+  assert.equal(write({phase:'scan',game:'KORABLI',datasetIndex:2,total:10,completed:0}),true);
+});
+
+test('Windows exclusive progress-file lock does not terminate a parallel preview', {skip:process.platform!=='win32'},()=>{
+  const folder=sourceFixture('windows-progress-lock'),file=path.join(temporary,'exclusive-progress.json');
+  const ship=JSON.parse(fs.readFileSync(path.join(folder,'Ships/TST001_Synthetic_Carrier.json')));
+  fs.writeFileSync(path.join(folder,'Ships/TST002_Copy.json'),JSON.stringify({...ship,name:'TST002_Copy'}));
+  fs.writeFileSync(file,JSON.stringify({phase:'old'}));
+  const script="$lock=[IO.File]::Open($env:RETICLE_TEST_PROGRESS,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None); try { & $env:RETICLE_TEST_NODE tools/data-publisher.mjs preview --source $env:RETICLE_TEST_SOURCE --game KORABLI --version test-lock --workers 2 --progress-file $env:RETICLE_TEST_PROGRESS; $code=$LASTEXITCODE } finally { $lock.Dispose() }; exit $code";
+  const result=spawnSync('pwsh',['-NoLogo','-NoProfile','-Command',script],{cwd:project,encoding:'utf8',timeout:30000,env:{...process.env,RETICLE_TEST_PROGRESS:file,RETICLE_TEST_SOURCE:folder,RETICLE_TEST_NODE:process.execPath}});
+  assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).ok,true);
+  assert.equal(JSON.parse(result.stdout).manifestHash,collectDataset({...options,source:folder,version:'test-lock'}).summary.manifestHash);
+  assert.equal(JSON.parse(fs.readFileSync(file)).phase,'old');
+  const recovered=spawnSync(process.execPath,['tools/data-publisher.mjs','preview','--source',folder,'--game','KORABLI','--version','test-lock','--progress-file',file],{cwd:project,encoding:'utf8',timeout:30000});
+  assert.equal(recovered.status,0,recovered.stderr);assert.equal(JSON.parse(fs.readFileSync(file)).phase,'finalize');
+});
 
 test('parallel scans match sequential bytes, summaries and hashes and reread changed files',async()=>{
   const folder=sourceFixture('parallel');

@@ -12,6 +12,22 @@ const root=path.resolve(import.meta.dirname,'..');
 export const repository='Ch0m1n/Air-Armament-Reticle';
 const execute=promisify(execFile);
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_]+$/.test(value);
+export function createProgressWriter(filename,{io=fs,now=Date.now,intervalMs=200}={}){
+  const pending=filename+'.'+process.pid+'.tmp';let lastKey='',lastAttempt=-Infinity;
+  return progress=>{
+    const stamp=now(),key=[progress.phase,progress.game,progress.datasetIndex,progress.total].join(':');
+    const complete=progress.phase==='scan'&&progress.total>0&&progress.completed>=progress.total;
+    if(key===lastKey&&!complete&&stamp-lastAttempt<intervalMs)return false;
+    lastKey=key;lastAttempt=stamp;
+    try{
+      // Progress is advisory. Publish complete JSON snapshots without blocking work on a GUI/AV lock.
+      io.writeFileSync(pending,JSON.stringify(progress),'utf8');
+      io.renameSync(pending,filename);
+      return true;
+    }catch{return false;}
+    finally{try{io.unlinkSync(pending);}catch{}}
+  };
+}
 function validateVersion(version){
   if(typeof version!=='string'||version.length>64||!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(version)||/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(version)||version.endsWith('.'))throw Error('Invalid version name. Use letters, digits, dots, hyphens or underscores (up to 64 characters).');
 }
@@ -249,7 +265,7 @@ async function main(){
   const options={source:values.source,game:values.game,version:values.version,expectedHash:values['expected-hash'],replace:values.replace};
   if(values.workers!==undefined)options.concurrency=Number(values.workers);
   if(values['batch-file'])options.datasets=JSON.parse(fs.readFileSync(values['batch-file'],'utf8')).datasets;
-  if(values['progress-file'])options.onProgress=progress=>fs.writeFileSync(values['progress-file'],JSON.stringify(progress));
+  if(values['progress-file'])options.onProgress=createProgressWriter(values['progress-file']);
   const result=mode==='preview'?(await (options.datasets?collectBatchParallel(options):collectDatasetParallel(options))).summary:await publishDataset(options);
   process.stdout.write(JSON.stringify({ok:true,...result})+'\n');
 }

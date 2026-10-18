@@ -2,6 +2,8 @@ const siteCatalogUrl=document.currentScript.dataset.catalog;
 const ui=id=>document.getElementById(id);
 const selections=[],jsonCache=new Map(),uploadedShips=new Map(),uploadedAircraft=new Map(),uploadedWeapons=new Map();
 const roleNames={bomb:'Bombers',torpedo:'Torpedo bombers',airstrike:'Airstrike',attack:'Attack aircraft',skip:'Skip bombers'};
+const comparisonOrder=['attack','bomb','torpedo','skip','airstrike'];
+const comparisonKinds=()=>comparisonOrder.filter(kind=>selections.some(item=>item.kind===kind));
 const supportedRoles=new Set(['bomb','torpedo','airstrike','attack']);
 let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
 let activeGame='korabli',activeVersion='';
@@ -116,29 +118,37 @@ function cardTools(item) {
     ${['bomb','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${item.kind==='bomb'?'Simulate bomb drops':'Simulate airstrike'}" title="${item.kind==='bomb'?'Illustrative bomb drops; not game RNG':'Simulate airstrike'}"${item.kind==='bomb'?bomberPayload(item)&&bomberSimulationRegion(item).outer?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${item.kind==='bomb'?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${label}</button>`).join('')}</div>`:''}`;
 }
 function renderComparisonTabs() {
-  ui('comparison-tabs').innerHTML=Object.entries(roleNames).map(([kind,label])=>`<button type="button" id="comparison-tab-${kind}" role="tab" data-comparison-tab="${kind}" aria-controls="comparison-${kind}" aria-selected="${kind===comparisonRole}" tabindex="${kind===comparisonRole?0:-1}">${label}<small>${selections.filter(item=>item.kind===kind).length}</small></button>`).join('');
-  const entries=!supportedRoles.has(comparisonRole)?[]:comparisonRole==='torpedo'?[['unarmed','Unarmed'],['minimum','Armed']]:comparisonRole==='attack'?[['minimum','Minimum aim (estimate)'],['maximum','Maximum aim (estimate)']]:comparisonRole==='bomb'?[['minimum','Minimum aim'],['maximum','Maximum aim'],['inner','Inner region']]:[['minimum','Drop area'],['inner','Inner region']];
+  ui('comparison-tabs').innerHTML=comparisonKinds().map(kind=>`<button type="button" id="comparison-tab-${kind}" role="tab" data-comparison-tab="${kind}" aria-controls="comparison-${kind}" aria-selected="${kind===comparisonRole}" tabindex="${kind===comparisonRole?0:-1}">${roleNames[kind]}<small>${selections.filter(item=>item.kind===kind).length}</small></button>`).join('');
+  const entries=!selections.length||!supportedRoles.has(comparisonRole)?[]:comparisonRole==='torpedo'?[['unarmed','Unarmed'],['minimum','Armed']]:comparisonRole==='attack'?[['minimum','Minimum aim (estimate)'],['maximum','Maximum aim (estimate)']]:comparisonRole==='bomb'?[['minimum','Minimum aim'],['maximum','Maximum aim'],['inner','Inner region']]:[['minimum','Drop area'],['inner','Inner region']];
   ui('legend-items').innerHTML=entries.map(([kind,label])=>`<span><i class="swatch ${kind}"></i>${label}</span>`).join('');
 }
 function selectComparisonRole(kind,focus=false) {
-  if(!Object.hasOwn(roleNames,kind))return;comparisonRole=kind;renderComparison();
+  if(!comparisonKinds().includes(kind))return;comparisonRole=kind;renderComparison();
   const url=new URL(location.href);url.searchParams.set('type',comparisonRole);history.replaceState(null,'',url);
   if(focus)ui('comparison-tab-'+kind).focus();
 }
 ui('comparison-tabs').addEventListener('click',event=>{const tab=event.target.closest('[data-comparison-tab]');if(tab)selectComparisonRole(tab.dataset.comparisonTab,true);});
 ui('comparison-tabs').addEventListener('keydown',event=>{
   const tab=event.target.closest('[data-comparison-tab]');if(!tab)return;
-  const kinds=Object.keys(roleNames),index=kinds.indexOf(tab.dataset.comparisonTab);
+  const kinds=comparisonKinds(),index=kinds.indexOf(tab.dataset.comparisonTab);
   const next=event.key==='ArrowRight'?(index+1)%kinds.length:event.key==='ArrowLeft'?(index+kinds.length-1)%kinds.length:event.key==='Home'?0:event.key==='End'?kinds.length-1:null;
   if(next!=null){event.preventDefault();selectComparisonRole(kinds[next],true);}
 });
 function renderComparison(focus=null) {
+  const kinds=comparisonKinds(),previousRole=comparisonRole;
+  if(!kinds.includes(comparisonRole))comparisonRole=kinds[0]||'bomb';
+  if(previousRole!==comparisonRole){
+    const url=new URL(location.href);
+    if(kinds.length)url.searchParams.set('type',comparisonRole);else url.searchParams.delete('type');
+    history.replaceState(null,'',url);
+  }
   ui('results').className='comparison-groups';
   renderComparisonTabs();
   ui('comparison-count').textContent=selections.length;
-  ui('comparison-subtitle').textContent=!supportedRoles.has(comparisonRole)?'Under the Maintenance!':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
+  ui('comparison-subtitle').textContent=!kinds.length?'No aircraft selected':!supportedRoles.has(comparisonRole)?'Under the Maintenance!':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
   ui('cards-view').setAttribute('aria-pressed',String(cardView));ui('list-view').setAttribute('aria-pressed',String(!cardView));
-  ui('results').innerHTML=Object.entries(roleNames).map(([kind,label])=>{
+  ui('results').innerHTML=kinds.map(kind=>{
+    const label=roleNames[kind];
     const members=supportedRoles.has(kind)?selections.filter(item=>item.kind===kind):[];
     const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members);
     const cards=members.map(item=>{
@@ -150,7 +160,7 @@ function renderComparison(focus=null) {
     }).join('');
     const empty=!supportedRoles.has(kind)?`<div class="maintenance-state"><h3>Under the Maintenance!</h3><img src="./assets/{{maintenance}}" alt="Two cats wearing a construction helmet and working with a hammer" width="642" height="680"></div>`:`<div class="empty-state">${gameEntries().length?'No '+label.toLowerCase()+' selected':'No '+gameNames[activeGame]+' dataset loaded'}</div>`;
     return `<section id="comparison-${kind}" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-${kind}" data-comparison-role="${kind}"${kind===comparisonRole?'':' hidden'}><div class="${cardView?'comparison-cards':'comparison-list'}">${cards||empty}</div></section>`;
-  }).join('');
+  }).join('')||'<div class="empty-state">No aircraft selected</div>';
   setBusy(busy);
   refreshExpandedDrawing();
   if(focus)ui('results').querySelector(`[data-action="${focus.action}"][data-id="${focus.id}"]`)?.focus();

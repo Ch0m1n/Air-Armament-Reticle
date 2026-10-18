@@ -103,7 +103,14 @@ function Set-Busy($busy) {
 }
 function Update-PublisherProgress($job) {
     if(-not [IO.File]::Exists($job.progressFile)){return}
-    try {$state=[IO.File]::ReadAllText($job.progressFile) | ConvertFrom-Json -ErrorAction Stop}catch{return}
+    $stream=$null; $reader=$null
+    try {
+        $sharing=[IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+        $stream=[IO.FileStream]::new($job.progressFile,[IO.FileMode]::Open,[IO.FileAccess]::Read,$sharing)
+        $reader=[IO.StreamReader]::new($stream)
+        $state=$reader.ReadToEnd() | ConvertFrom-Json -ErrorAction Stop
+    }catch{return}
+    finally{if($reader){$reader.Dispose()}elseif($stream){$stream.Dispose()}}
     if($state.phase -eq 'scan' -and $state.total -gt 0){
         $percent=[Math]::Min(100,[Math]::Floor(100*$state.completed/$state.total))
         $progress.Style='Blocks'; $progress.Value=$percent
@@ -163,7 +170,7 @@ function Start-Publisher($mode) {
         Set-Busy $true; $status.Text=if($mode -eq 'preview'){'Checking references...'}else{'Uploading in an isolated Git checkout...'}
         $timer.Start()
     } catch {
-        if($progressFile -and [IO.File]::Exists($progressFile)){[IO.File]::Delete($progressFile)}
+        if($progressFile -and [IO.File]::Exists($progressFile)){try{[IO.File]::Delete($progressFile)}catch{}}
         if($batchFile -and [IO.File]::Exists($batchFile)){[IO.File]::Delete($batchFile)}
         $output.Text=$_.Exception.Message; $status.Text='Failed'; Set-Busy $false
     }
@@ -197,7 +204,7 @@ $timer.Add_Tick({
     finally {
         $job.process.Dispose(); Set-Busy $false
         $progress.Value=if($status.Text -like 'Failed*'){0}else{100}
-        if([IO.File]::Exists($job.progressFile)){[IO.File]::Delete($job.progressFile)}
+        if([IO.File]::Exists($job.progressFile)){try{[IO.File]::Delete($job.progressFile)}catch{}}
         if($job.batchFile -and [IO.File]::Exists($job.batchFile)){[IO.File]::Delete($job.batchFile)}
     }
 })
