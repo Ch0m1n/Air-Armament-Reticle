@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aircraft Pattern Viewer</title>
+<style>
+:root{color-scheme:dark;--bg:#131719;--panel:#1d2427;--line:#3f4b50;--text:#e9eff0;--muted:#aebdc1;--green:#6ed7ad;--amber:#e4bd6c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}header,main{max-width:1140px;margin:auto;padding:20px}header{border-bottom:1px solid var(--line)}h1{font-size:23px;margin:0}h2{font-size:17px;margin:0;overflow-wrap:anywhere}p{margin:6px 0;color:var(--muted)}button,input,select{font:inherit;color:inherit}button,select{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:7px 10px}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:hover:not(:disabled){border-color:var(--green)}:focus-visible{outline:2px solid var(--green);outline-offset:3px}a{color:var(--green)}.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}.toolbar span{margin-left:auto;color:var(--muted)}#files{display:none}#drop{border:1px dashed var(--line);padding:28px 18px;text-align:center;margin-bottom:18px;background:var(--panel)}#drop.over{border-color:var(--green)}#drop p{font-size:14px}.status{min-height:24px;color:var(--amber);overflow-wrap:anywhere}article{border-top:1px solid var(--line);padding:18px 0}article:first-child{border-top:0}.result-header{display:flex;gap:12px;justify-content:space-between;align-items:flex-start}.result-header button{flex-shrink:0}.filename{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.result-grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;margin-top:12px}.visual{min-width:0}svg{display:block;width:100%;height:240px;background:#182022}.detail{min-width:0}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}td:last-child{text-align:right}th{color:var(--muted);font-weight:500}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}summary{cursor:pointer;color:var(--muted)}.badge{color:var(--green);font-size:12px}.warning{color:var(--amber);font-size:12px;margin:9px 0}.drawing-note{font-size:12px}.travel-control{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:8px;font-size:12px}.travel-control select{max-width:100%}.empty{padding:24px 0;color:var(--muted)}footer{max-width:1140px;margin:20px auto;padding:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}footer details{margin-top:8px}circle{fill:var(--green)}.ellipse-outer{fill:#6ed7ad18;stroke:var(--green);stroke-width:2}.ellipse-inner{fill:#e4bd6c18;stroke:var(--amber);stroke-width:2}.travel{stroke:#718b96;stroke-width:1.2;fill:none}svg text{fill:var(--muted);font:11px system-ui,sans-serif}svg .dot-label{fill:var(--text);font-size:10px}@media(max-width:680px){header,main{padding:16px}.result-grid{grid-template-columns:minmax(0,1fr);gap:12px}.visual{max-width:340px;width:100%;margin:auto}.toolbar span{margin-left:0;width:100%}}
+.reference-tools{display:flex;gap:6px;margin-bottom:8px;min-height:38px}.reference-tools [aria-pressed="true"]{border-color:var(--green);background:#244438}.drawing-wrap{position:relative}.distance-control{position:absolute;right:0;top:14.6%;height:58.3%;display:flex;align-items:center;flex-direction:column;gap:3px;width:20px}.distance-control span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.distance-control input{writing-mode:vertical-lr;direction:rtl;width:20px;height:100%;min-height:0;margin:0;accent-color:var(--green)}.distance-control output{position:absolute;top:calc(100% + 24px);right:0;font-size:10px;white-space:nowrap}.yamato-target image{filter:brightness(0) invert(.82);opacity:.8}
+.drawing-wrap>svg{height:auto;aspect-ratio:5/4}.reference-tools button{display:inline-flex;align-items:center;gap:6px}.reference-tools img{width:6px;height:28px;transform:rotate(90deg);margin:0 10px;filter:brightness(0) invert(.82)}
+.distribution-control{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:12px;color:var(--muted)}.ellipse-distribution{fill:none;stroke:#ff6b6b;stroke-width:2;stroke-dasharray:5 4}.ellipse-inner{fill:none}
+.ellipse-maximum{fill:none;stroke:var(--amber);stroke-width:1.5;stroke-dasharray:5 4}
+.airstrike-outline{fill:none;stroke:var(--green);stroke-width:2}.airstrike-drop{fill:#ff8496;stroke:#182022;stroke-width:.5;opacity:0;animation:airstrike-release 1ms step-end forwards}@keyframes airstrike-release{from{opacity:0}to{opacity:1}}
+.toolbar #compare{margin-left:auto}.toolbar span{margin-left:0}.toolbar label{display:flex;gap:6px;align-items:center}.toolbar [hidden]{display:none}.toolbar [aria-pressed="true"]{border-color:var(--green);background:#244438}.reference-tools{flex-wrap:wrap}.comparison-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start}.comparison-cards article{border:1px solid var(--line);border-radius:4px;padding:12px;min-width:0}.comparison-cards .result-grid{display:block}.comparison-cards .visual{max-width:none;width:100%;margin:0}.comparison-cards .detail{margin-top:12px}.comparison-cards h2{font-size:15px}.card-data>summary{padding:7px 0}.dependency-panel{border-bottom:1px solid var(--line);padding:14px 0;margin-bottom:12px}.dependency-panel h2{font-size:16px}.dependency-panel table{font-size:12px}.dependency-panel td:last-child{width:150px}.file-required{color:var(--amber)}.file-loaded{color:var(--green)}.dependency-panel code{overflow-wrap:anywhere}#scale-note{font-size:12px;margin:12px 0}@media(max-width:680px){.toolbar #compare{margin-left:0}.comparison-cards{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header><h1>Aircraft Pattern Viewer</h1><p>Bomb aiming areas, airstrikes &amp; torpedo drop layouts</p><div class="toolbar"><button id="open" type="button">Open JSON files</button><button id="export" type="button" disabled>Export results</button><button id="clear" type="button" disabled>Clear</button><button id="compare" type="button" aria-pressed="false">Compare cards</button><label id="scale-option" hidden><input id="shared-scale" type="checkbox" checked>Same scale</label><span>Offline · No uploads · No installation</span></div><input id="files" type="file" accept=".json,application/json" multiple></header>
+<main><div id="drop"><strong>Ship + Aircraft + Projectile JSON</strong><p>Ship, aircraft, weapon and referenced Ability files</p><button id="browse" type="button">Choose files</button></div><div id="status" class="status" role="status" aria-live="polite"></div><div id="dependencies"></div><p id="scale-note" hidden>Bombs / airstrikes: estimated meters. Torpedoes: range axis in meters; horizontal spacing remains schematic.</p><div id="results"><p class="empty">No aircraft loaded.</p></div></main>
+<footer>Reference diagrams only. Not a game simulation. Use files from the same dataset version; versions are not inferred from filenames.<details><summary>Methods &amp; limitations</summary><p>Bomb dimensions use the current MKtool estimate: W = round(60 × salvoX); H = round(60 × maxSpreadY / maxSpreadX × salvoY) + round(2.69 × speedMoveWithBomb × (attackCount − 1) × attackInterval). Green is the estimated minimum (fully aimed) outline; dashed amber is the maximum outline. Minimum width = maximum width × minSpreadX / maxSpreadX; minimum height = (maximum height − movement offset) × minSpreadY / maxSpreadY + movement offset. Dashed red is the innerSalvoSize region scaled to full aim with the same minSpread / maxSpread ratios. Its percentage is a bomb allocation parameter, not target hit probability; the actual RNG remains unverified. Absolute dimensions, coefficients, dynamic aiming and build effects are not independently verified.</p><p>Torpedo diagrams use formations.attack[1]. Multiple payloads and releases are schematic. Estimated travel compares formation width with minSpread at torpedoAimDist, assuming shared raw units. Positive edge angles up to 4° are displayed as near parallel; this is a display heuristic, not a game constant. Manual overrides remain available.</p><p>Load the referenced torpedo Projectile JSON for range and arming data. Range = maxDist × 30 m; arming distance = speed × armingTime × 2.686 m, matching MKtool. All loaded torpedo diagrams use the longest known range as the shared vertical scale. Horizontal spacing and trajectory angles remain schematic. Blank means unarmed; green means armed.</p><p>Old aircraft files can remain in GameParams. Confirm the aircraft reference in the correct ship's torpedo-bomber component. Formation mismatches are not guessed away.</p><p><a href="https://landaire.net/world-of-warships-deobfuscation/#end-result" target="_blank" rel="noopener noreferrer">Historical client-code analysis</a> · <a href="https://www.reddit.com/r/WorldOfWarships/comments/1975jry/" target="_blank" rel="noopener noreferrer">Torpedo aiming-area research</a></p></details></footer>
+<script>
+'use strict';
+// Pure analysis: no game scripts are executed.
+function finite(v) { return typeof v === 'number' && Number.isFinite(v); }
+function positive(v) { return finite(v) && v > 0; }
+function pair(v) { return Array.isArray(v) && v.length >= 2 && v.slice(0,2).every(positive); }
+function validId(value) { return typeof value==='string'&&/^[A-Za-z0-9_]{1,160}$/.test(value); }
+function aircraftReferences(raw) {
+  const refs=new Map();let visited=0;
+  const add=(id,context)=>{if(!validId(id))return;if(!refs.has(id))refs.set(id,{id,contexts:[]});const entry=refs.get(id);if(!entry.contexts.includes(context))entry.contexts.push(context);};
+  const walk=(node,path,depth)=>{
+    if(++visited>100000||depth>24)throw Error('Reference tree exceeds the supported size.');
+    if(!node||typeof node!=='object')return;
+    for(const [key,value] of Object.entries(node)) {
+      const context=[...path,key].join(' / ');
+      if(key==='planes'&&Array.isArray(value))value.forEach(id=>add(id,context));
+      else if(key==='ammoList'&&path.some(part=>/airsupport/i.test(part))&&Array.isArray(value))value.forEach(id=>add(id,context));
+      else if(['planeName','fightersName','scoutName','spotterName'].includes(key))add(value,context);
+      else if(key==='consumablePlaneTypes'&&value&&typeof value==='object')for(const [role,id] of Object.entries(value))add(id,context+' / '+role);
+      if(value&&typeof value==='object')walk(value,[...path,key],depth+1);
+    }
+  };
+  walk(raw,[],0);
+  return [...refs.values()];
+}
+function airstrikeTimingSupports(raw) {
+  const result=[];let visited=0;
+  const walk=(node,path,depth)=>{
+    if(++visited>100000||depth>24)throw Error('Reference tree exceeds the supported size.');
+    if(!node||typeof node!=='object')return;
+    if(path.some(part=>/airsupport/i.test(part))&&finite(node.minDist)&&finite(node.maxDist)) {
+      const planes=validId(node.planeName)?[node.planeName]:Array.isArray(node.ammoList)?node.ammoList.filter(validId):[];
+      for(const plane of planes)result.push({plane,context:path.join(' / '),params:Object.fromEntries([
+        'minDist','maxDist','maxPlaneFlightDist','timeFromHeaven','useFixedTimeToAttackPoint',
+        'minTimeToAttackPoint','maxTimeToAttackPoint','maxTimeToAttackPointDistance',
+      ].filter(key=>Object.hasOwn(node,key)).map(key=>[key,node[key]]))});
+    }
+    for(const [key,value] of Object.entries(node))if(value&&typeof value==='object')walk(value,[...path,key],depth+1);
+  };
+  walk(raw,[],0);return result;
+}
+function shipManifest(raw,filename) {
+  if(raw?.typeinfo?.type!=='Ship'||!validId(raw.name))throw Error('Expected a Ship JSON with an internal name ID.');
+  const aircraft=aircraftReferences(raw),abilities=[];
+  for(const [slot,entry] of Object.entries(raw.ShipAbilities||{}))for(const value of entry?.abils||[]) {
+    if(Array.isArray(value)&&validId(value[0])&&validId(value[1])&&!abilities.some(a=>a.id===value[0]&&a.profile===value[1]))abilities.push({id:value[0],profile:value[1],slot});
+  }
+  const upgrades=raw.ShipUpgradeInfo||{};
+  for(const reference of aircraft) {
+    const components=new Set(reference.contexts.map(context=>context.split(' / ')[0]));
+    reference.modules=Object.entries(upgrades).flatMap(([id,upgrade])=>Object.entries(upgrade?.components||{}).flatMap(([role,names])=>Array.isArray(names)&&names.some(name=>components.has(name))?[{id,role}]:[]));
+  }
+  return {name:raw.name,filename,aircraft,abilities,timingSupports:airstrikeTimingSupports(raw)};
+}
+function aircraftAbilities(manifest,abilities) {
+  return manifest.abilities.flatMap(ref=>{
+    const file=abilities.get(ref.id),profile=file&&Object.hasOwn(file,ref.profile)?file[ref.profile]:null;
+    const aircraft=profile?aircraftReferences(profile):[];
+    return aircraft.length?[{...ref,aircraft}]:[];
+  });
+}
+function manifestAircraft(manifest,abilities) {
+  const refs=manifest.aircraft.map(ref=>({...ref,contexts:[...ref.contexts]}));
+  for(const ability of aircraftAbilities(manifest,abilities)) {
+    for(const ref of ability.aircraft) {
+      const existing=refs.find(r=>r.id===ref.id),context=`${ability.slot} / ${ability.id} / ${ability.profile}`;
+      if(existing)existing.contexts.push(context);else refs.push({...ref,contexts:[context],modules:[]});
+    }
+  }
+  return refs;
+}
+function weaponReferences(raw) {
+  return [...new Set(['bombName','torpedoName','rocketName','shellName'].map(key=>raw?.[key]).filter(validId))];
+}
+function commonMetricExtent(items) {
+  return Math.max(1,...items.filter(r=>!r.referenceOnlyReason&&(r.kind==='bomb'||r.kind==='airstrike'&&r.weaponVerified)).flatMap(r=>[r.outer,r.aimMinimum,r.aimInner].filter(Boolean).flatMap(d=>[d.width,d.height]).concat(r.reference?[263]:[])));
+}
+function referenceOnlyReason(result,manifests,abilities,projectiles) {
+  if(result.kind!=='bomb')return null;
+  const weapon=projectiles.get(result.projectile);
+  if(['DC','depthcharge'].includes(weapon?.ammoType)||weapon?.planeAmmoType==='depthcharge'||weapon?.typeinfo?.species==='DepthCharge')return 'ASW / DC excluded';
+  const support=manifests.some(ship=>manifestAircraft(ship,abilities).some(ref=>ref.id===result.name
+    &&(ref.contexts.some(context=>/airsupport/i.test(context))||ref.modules?.some(module=>module.role==='airSupport'))));
+  return support?'Air-support reference only: unsupported geometry':null;
+}
+function parseAircraftJson(text) {
+  text=text.replace(/^\uFEFF/,'');
+  try { return {data:JSON.parse(text),nonFinite:0}; } catch {}
+  let clean='',quoted=false,escaped=false,nonFinite=0;
+  for(let i=0;i<text.length;) {
+    const c=text[i];
+    if(quoted){clean+=c;i++;if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c==='"')quoted=false;continue;}
+    if(c==='"'){quoted=true;clean+=c;i++;continue;}
+    const token=text.slice(i).match(/^(?:-Infinity|Infinity|NaN)(?=\s*[,}\]])/);
+    if(token && /[:\[,]\s*$/.test(clean)){clean+='null';i+=token[0].length;nonFinite++;}else{clean+=c;i++;}
+  }
+  return {data:JSON.parse(clean),nonFinite};
+}
+function estimatedDirection(r) {
+  if(!positive(r.raw.torpedoAimDist)||!finite(r.raw.minSpread)||r.raw.minSpread<0||!positive(r.spanX))return 'unknown';
+  const angle=Math.atan2((r.raw.minSpread-r.spanX)/2,r.raw.torpedoAimDist)*180/Math.PI;
+  return angle<0?'converging':angle<=4?'parallel':'diverging';
+}
+function attachTorpedoWeapon(r,weapon) {
+  if(weapon&&weapon.ammoType!=='torpedo'&&weapon.planeAmmoType!=='torpedo')weapon=null;
+  const range=positive(weapon?.maxDist)?weapon.maxDist*30:null;
+  const arming=positive(weapon?.speed)&&finite(weapon?.armingTime)&&weapon.armingTime>=0?weapon.speed*weapon.armingTime*2.686:null;
+  r.rangeDistance=finite(range)?range:null;
+  r.armingDistance=finite(arming)?arming:null;
+  r.weapon=weapon?{speed:weapon.speed,armingTime:weapon.armingTime,maxDist:weapon.maxDist}:null;
+}
+function commonDistance(items) { return Math.max(0,...items.filter(r=>r.kind==='torpedo').map(r=>r.rangeDistance||0)); }
+function airstrikePayload(raw) {
+  const values=[raw.attackerSize,raw.projectilesPerAttack,raw.attackCount];
+  return values.every(n=>Number.isInteger(n)&&n>0) && values[0]*values[1]<=128 && values.reduce((a,b)=>a*b,1)<=4096
+    ? {aircraft:values[0],perRelease:values[1],releases:values[2],count:values.reduce((a,b)=>a*b,1),interval:raw.attackInterval}:null;
+}
+function attachAirstrikeWeapon(r,weapon) {
+  if(weapon?.name!==r.projectile)weapon=null;
+  const ammo=weapon?.ammoType;
+  r.weaponVerified=!!weapon && ['HE','AP','CS','SAP'].includes(ammo) && weapon.planeAmmoType!=='depthcharge' && weapon.typeinfo?.species!=='DepthCharge';
+  r.excluded=!!weapon&&!r.weaponVerified;
+  r.ammo=ammo||null;
+  if(!r.weaponVerified)r.attack=null;
+}
+function airstrikeImpactTime(raw,params,weapon,distance) {
+  const nonnegative=n=>finite(n)&&n>=0;
+  if(![params.minDist,params.maxDist,distance].every(nonnegative)||params.maxDist<params.minDist)return null;
+  distance=Math.max(params.minDist,Math.min(params.maxDist,distance));
+  let approach;
+  if(params.useFixedTimeToAttackPoint===true) {
+    const low=params.minTimeToAttackPoint,high=params.maxTimeToAttackPoint,limit=params.maxTimeToAttackPointDistance;
+    if(![low,high,limit].every(nonnegative)||high<low)return null;
+    approach=limit===0?high:low+(high-low)*Math.min(distance/limit,1);
+  } else if(params.useFixedTimeToAttackPoint===false) {
+    const speed=raw.speedMoveWithBomb*(1852/3600)*2.61*2;
+    if(!positive(speed)||![raw.throttleAcceleration,raw.throttleDeceleration,params.timeFromHeaven,params.maxPlaneFlightDist].every(nonnegative))return null;
+    const d=Math.min(distance,params.maxPlaneFlightDist);let travel=d/speed;
+    if(raw.throttleAcceleration>0) {
+      const cap=speed*raw.speedMax,a=speed*raw.throttleAcceleration;
+      if(!finite(cap)||cap<speed)return null;
+      const capTime=(cap-speed)/a,capDistance=speed*capTime+a*capTime**2/2;
+      travel=d<=capDistance?2*d/(Math.sqrt(speed**2+2*a*d)+speed):capTime+(d-capDistance)/cap;
+    } else if(raw.throttleDeceleration>0)return null;
+    approach=params.timeFromHeaven+travel;
+  } else return null;
+  let fall;
+  if(weapon?.withParachute===true&&nonnegative(weapon.fallTime))fall=weapon.fallTime;
+  else if(weapon?.withParachute===false&&[raw.flightHeight,weapon.fallingTimeCoef].every(nonnegative))fall=Math.sqrt(2*raw.flightHeight/10)*weapon.fallingTimeCoef;
+  else return null;
+  return finite(approach+fall)?approach+fall:null;
+}
+function airstrikeTimingRanges(r,manifests,weapon) {
+  if(r.kind!=='airstrike'||!r.weaponVerified||weapon?.name!==r.projectile)return [];
+  return manifests.flatMap(ship=>(ship.timingSupports||[]).filter(s=>s.plane===r.name).flatMap(s=>{
+    const min=airstrikeImpactTime(r.raw,s.params,weapon,s.params.minDist),max=airstrikeImpactTime(r.raw,s.params,weapon,s.params.maxDist);
+    return min==null||max==null?[]:[{ship:ship.name,context:s.context,minRange:s.params.minDist,maxRange:s.params.maxDist,min,max}];
+  }));
+}
+function airstrikeTimingRows(r) {
+  const ranges=r.timingRanges||[];
+  return ranges.length?ranges.map(value=>['Flight time (min-max)'+(ranges.length>1?' / '+value.ship+' / '+value.context:''),
+    `${Number(value.min.toFixed(1))}s-${Number(value.max.toFixed(1))}s`]):[['Flight time (min-max)','Unavailable: matching Ship + Projectile timing inputs required']];
+}
+function analyzeAirstrike(result) {
+  const raw=result.raw;
+  if(raw.isLineBomber||raw.isMeshEllipseBomber)throw Error('Line/mesh airstrike geometry is not supported.');
+  if(!pair(raw.outerSalvoSize)||!pair(raw.minSpread)||!finite(raw.speedMoveWithBomb)||raw.speedMoveWithBomb<0
+    ||!Number.isInteger(raw.attackCount)||raw.attackCount<1||!finite(raw.attackInterval)||raw.attackInterval<0
+    ||!finite(raw.throttleAcceleration)||raw.throttleAcceleration<0||!finite(raw.throttleDeceleration)||raw.throttleDeceleration<0)throw Error('Missing or invalid airstrike geometry, spread or throttle inputs.');
+  const limit=raw.throttleAcceleration>0?raw.speedMax:raw.throttleDeceleration>0?raw.speedMin:1;
+  if(!positive(limit))throw Error('Missing airstrike approach speed limit.');
+  const drop=(raw.attackCount-1)*raw.attackInterval*raw.speedMoveWithBomb*(1852/3600)*2.61*limit;
+  const region=salvo=>pair(salvo)?{width:Math.round(30*salvo[0]*raw.minSpread[0]),baseHeight:Math.round(30*salvo[1]*raw.minSpread[1]),height:Math.round(30*salvo[1]*raw.minSpread[1]+drop),drop}:null;
+  result.kind='airstrike';result.outer=region(raw.outerSalvoSize);result.inner=region(raw.innerSalvoSize);
+  if(![result.outer.width,result.outer.height,result.outer.baseHeight].every(positive))throw Error('Invalid airstrike dimensions.');
+  if(result.inner&&(![result.inner.width,result.inner.height,result.inner.baseHeight].every(positive)||result.inner.width>result.outer.width||result.inner.height>result.outer.height))result.inner=null;
+  result.innerPercentage=finite(raw.innerBombsPercentage)&&raw.innerBombsPercentage>=0&&raw.innerBombsPercentage<=100?raw.innerBombsPercentage:null;
+  result.payload=airstrikePayload(raw);attachAirstrikeWeapon(result,null);
+  result.warnings.push('Experimental ship-scale geometry at capped approach speed and default time scale, not the legacy reticle-size stat. Short approaches and build effects are not simulated.');
+  result.warnings.push('Illustrative release sequence only. Formation spacing, bomb fall time and game RNG are not reproduced; points are not hit probability.');
+  return result;
+}
+function simulateAirstrike(r,random=Math.random) {
+  if(!r.weaponVerified||!r.payload)return [];
+  const p=r.payload,points=[],inner=r.inner;
+  const split=inner&&r.innerPercentage!=null;
+  const sample=d=>{const radius=Math.sqrt(random()),angle=random()*Math.PI*2;return {x:Math.cos(angle)*radius*d.width/2,y:Math.sin(angle)*radius*d.baseHeight/2};};
+  for(let release=0;release<p.releases;release++)for(let i=0;i<p.aircraft*p.perRelease;i++) {
+    let point=null;
+    if(split&&random()*100<r.innerPercentage)point=sample(inner);
+    else for(let attempt=0;attempt<256;attempt++) {
+      const candidate=sample(r.outer);
+      if(!split||(candidate.x/(inner.width/2))**2+(candidate.y/(inner.baseHeight/2))**2>1){point=candidate;break;}
+    }
+    if(!point)return [];
+    const center=p.releases===1?0:r.outer.drop*(.5-release/(p.releases-1));
+    points.push({...point,y:point.y+center,release,time:release*p.interval});
+  }
+  return points;
+}
+function analyze(input, filename) {
+  if (!input || Array.isArray(input) || typeof input !== 'object') throw Error('Expected one Aircraft JSON object.');
+  if (input.typeinfo?.type && input.typeinfo.type !== 'Aircraft') throw Error('This is not an Aircraft file.');
+  const raw = input;
+  const result = {name: typeof raw.name === 'string' ? raw.name : filename, filename, projectile: raw.torpedoName || raw.bombName || null, raw, warnings: []};
+  if(raw.isAirSupportPlane===true)return analyzeAirstrike(result);
+  // Reserved categories must not fall through to generic bomb or torpedo geometry.
+  if(raw.rocketName)throw Error('Attack aircraft reticle geometry is not supported yet.');
+  if(/skip/i.test(raw.name||'')||raw.typeinfo?.species==='Skip')throw Error('Skip-bomber reticle geometry is not supported yet.');
+  if (typeof raw.minSpread === 'number' && typeof raw.maxSpread === 'number' && raw.formations?.attack) {
+    result.kind = 'torpedo';
+    result.planes = raw.attackerSize; result.perPlane = raw.projectilesPerAttack; result.releases = raw.attackCount;
+    const positions = raw.formations.attack[1];
+    if (!Number.isInteger(result.planes) || result.planes < 1 || result.planes > 50 || !Array.isArray(positions)
+      || positions.length !== result.planes || !positions.every(p => Array.isArray(p) && p.length === 3 && p.every(n=>finite(n)&&Math.abs(n)<=1e6))) {
+      throw Error('Attack formation and attackerSize do not match, or coordinates are invalid. This may be legacy data.');
+    }
+    if (![result.perPlane,result.releases].every(n=>Number.isInteger(n)&&n>0&&n<=50)) throw Error('Invalid projectilesPerAttack or attackCount.');
+    if(!finite(raw.minSpread)||raw.minSpread<0||!finite(raw.maxSpread)||raw.maxSpread<0)throw Error('Invalid torpedo spread.');
+    result.points = positions.map(([x,y,z])=>({x,y,z}));
+    result.total = result.planes * result.perPlane * result.releases;
+    if(result.total>128)throw Error('Attack payload exceeds the supported diagram limit (128).');
+    result.spanX = Math.max(...result.points.map(p=>p.x))-Math.min(...result.points.map(p=>p.x));
+    result.spanZ = Math.max(...result.points.map(p=>p.z))-Math.min(...result.points.map(p=>p.z));
+    result.rows = new Set(result.points.map(p=>p.z)).size;
+    result.direction = estimatedDirection(result); result.directionSource = 'experimental estimate';
+    attachTorpedoWeapon(result,null);
+    if (result.perPlane > 1) result.warnings.push('Dot spacing within each bundle is schematic, not actual torpedo spacing.');
+    if (result.releases > 1) result.warnings.push('Multiple releases: forward movement between releases is not drawn.');
+    result.warnings.push('Travel is an experimental full-aim estimate, not a verified game trajectory.');
+    return result;
+  }
+  if (pair(raw.outerSalvoSize) || pair(raw.innerSalvoSize) || pair(raw.reticleSize) || pair(raw.reticleSizeMax)) {
+    result.kind = 'bomb';
+    if (!pair(raw.maxSpread)) throw Error('Bomb estimate requires a positive two-element maxSpread array.');
+    if (!finite(raw.speedMoveWithBomb) || raw.speedMoveWithBomb < 0 || !Number.isInteger(raw.attackCount) || raw.attackCount < 1
+      || !finite(raw.attackInterval) || raw.attackInterval < 0) throw Error('Missing or invalid movement/release inputs; cannot calculate a trustworthy estimate.');
+    const ratio = raw.maxSpread[1]/raw.maxSpread[0];
+    const offsetRaw = 2.69*raw.speedMoveWithBomb*(raw.attackCount-1)*raw.attackInterval;
+    result.offset = Math.round(offsetRaw); result.offsetRaw = offsetRaw; result.ratio = ratio;
+    function ellipse(salvo) {
+      if (!pair(salvo)) return null;
+      const width = Math.round(60*salvo[0]), baseHeight = Math.round(60*ratio*salvo[1]);
+      const height = baseHeight+result.offset;
+      if (![width,height].every(positive)) throw Error('Invalid calculated ellipse dimensions.');
+      return {width,height,baseHeight,salvo:salvo.slice(0,2)};
+    }
+    result.outer = ellipse(raw.outerSalvoSize);
+    result.inner = ellipse(raw.innerSalvoSize || raw.reticleSize || raw.reticleSizeMax);
+    result.aimMinimum = pair(raw.minSpread) && raw.minSpread.every((v,i)=>v<=raw.maxSpread[i]) && result.outer
+      ? {width:result.outer.width*raw.minSpread[0]/raw.maxSpread[0],height:result.outer.baseHeight*raw.minSpread[1]/raw.maxSpread[1]+result.offset}
+      : null;
+    result.aimInner = result.aimMinimum && result.inner
+      ? {width:result.inner.width*raw.minSpread[0]/raw.maxSpread[0],height:result.inner.baseHeight*raw.minSpread[1]/raw.maxSpread[1]+result.offset}
+      : null;
+    if(!result.aimMinimum)result.warnings.push('Minimum aiming outline unavailable: missing or inconsistent minSpread.');
+    result.innerPercentage = finite(raw.innerBombsPercentage) && raw.innerBombsPercentage>=0 && raw.innerBombsPercentage<=100 ? raw.innerBombsPercentage : null;
+    result.warnings.push('MKtool estimate, not an independently verified in-game formula.');
+    result.warnings.push('Raw file only: aiming state, maneuvering and build effects are not simulated.');
+    if (/skip/i.test(raw.name || '') || raw.typeinfo?.species === 'Skip') result.warnings.push('Skip-bomber geometry may differ; this generic bomb estimate is not validated for skip bombers.');
+    return result;
+  }
+  throw Error('No supported bomb ellipse or torpedo attack-formation data found.');
+}
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function commonScale(items) {
+  const torps=items.filter(r=>r.kind==='torpedo');
+  return Math.min(14, 210/Math.max(1,...torps.map(r=>r.spanX)), 92/Math.max(1,...torps.map(r=>r.spanZ)));
+}
+const YAMATO_IMAGE = 'data:image/png;base64,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';
+function yamatoDrawing(x,y,scale,rotation=0) {
+  return `<g class="yamato-target" transform="translate(${x} ${y}) rotate(${rotation})"><title>Yamato: 263 m × 38.9 m</title><svg x="${-38.9*scale/2}" y="${-263*scale/2}" width="${38.9*scale}" height="${263*scale}" viewBox="1 3 155 998" preserveAspectRatio="none"><image href="${YAMATO_IMAGE}" width="157" height="1004"/></svg></g>`;
+}
+function referenceControls(r) {
+  return `<div class="reference-tools"><button type="button" data-reference="${r.id}" aria-pressed="${!!r.reference}" title="Compare with Yamato (263 m × 38.9 m)"><img src="${YAMATO_IMAGE}" alt="">Yamato</button>${r.kind!=='torpedo'?`<button type="button" data-rotate="${r.id}" title="Rotate Yamato 90 degrees" aria-label="Rotate Yamato 90 degrees"${r.reference?'':' disabled'}>&#8635;</button>`:''}${r.kind==='airstrike'?`<button type="button" data-airstrike-play="${r.id}" title="Simulate one airstrike" aria-label="Simulate one airstrike"${r.weaponVerified&&r.payload?'':' disabled'}>&#9654;</button><button type="button" data-airstrike-clear="${r.id}"${r.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>`;
+}
+function airstrikeDrawing(r,extent=Math.max(r.outer.width,r.outer.height,r.reference?263:1)) {
+  if(!r.weaponVerified)return `<svg viewBox="0 0 300 240" role="img" aria-label="Airstrike weapon verification"><text x="150" y="112" text-anchor="middle">${r.excluded?'ASW / unsupported weapon excluded':'Load the required bomb Projectile JSON'}</text></svg>`;
+  const scale=160/extent,w=r.outer.width*scale,h=r.outer.height*scale,l=150-w/2,t=112-h/2,right=150+w/2,bottom=112+h/2;
+  const elapsed=r.attack?Date.now()-r.attack.startedAt:0;
+  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="Experimental airstrike area"><text x="150" y="18" text-anchor="middle">Airstrike · ship-scale estimate</text><path class="airstrike-outline" d="M ${l+w/4} ${t} H ${l} V ${t+h/4} M ${right-w/4} ${t} H ${right} V ${t+h/4} M ${l} ${bottom-h/4} V ${bottom} H ${l+w/4} M ${right} ${bottom-h/4} V ${bottom} H ${right-w/4}"/>${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${r.inner?`<rect class="ellipse-distribution" x="${150-r.inner.width*scale/2}" y="${112-r.inner.height*scale/2}" width="${r.inner.width*scale}" height="${r.inner.height*scale}" rx="${r.inner.width*scale/2}" ry="${r.inner.baseHeight*scale/2}"/>`:''}${(r.attack?.points||[]).map(p=>`<circle class="airstrike-drop" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.2" style="animation-delay:${Math.round(p.time*1000-elapsed)}ms"/>`).join('')}<text x="150" y="218" text-anchor="middle">${r.outer.width} × ${r.outer.height} m${r.reference?' · Yamato: 263 m':''}</text><text x="150" y="234" text-anchor="middle">Red: inner-region estimate · not hit probability</text></svg>`;
+}
+function targetDistance(r,distanceScale) {
+  return Math.max(0,Math.min(distanceScale,finite(r.targetDistance)?r.targetDistance:Math.min(distanceScale,r.armingDistance||distanceScale*.3)));
+}
+function bombDrawing(r,extent=null) {
+  const dimensions=[r.outer,r.aimMinimum,r.aimInner].filter(Boolean);
+  if(!dimensions.length)return '<svg viewBox="0 0 300 240" role="img" aria-label="Minimum aiming outline unavailable"><text x="150" y="123" text-anchor="middle">Minimum aiming outline unavailable</text></svg>';
+  const rotated=!!r.rotation;
+  const scale=positive(extent)?160/extent:Math.min(210/Math.max(...dimensions.map(d=>d.width),r.reference?(rotated?263:38.9):0),160/Math.max(...dimensions.map(d=>d.height),r.reference?(rotated?38.9:263):0));
+  const d=r.aimMinimum;
+  const maximum=r.outer?`<ellipse class="ellipse-maximum" cx="150" cy="112" rx="${r.outer.width*scale/2}" ry="${r.outer.height*scale/2}"/>`:'';
+  const minimum=d?`<ellipse class="ellipse-outer" cx="150" cy="112" rx="${d.width*scale/2}" ry="${d.height*scale/2}"/>`:'';
+  const inner=r.aimInner?`<ellipse class="ellipse-distribution" cx="150" cy="112" rx="${r.aimInner.width*scale/2}" ry="${r.aimInner.height*scale/2}"/>`:'';
+  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="Estimated minimum and maximum aiming outlines and fully aimed inner bomb region"><text x="150" y="18" text-anchor="middle">Aiming outline estimate</text>${maximum}${minimum}${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${inner}<text x="150" y="218" text-anchor="middle">Minimum: green · Maximum: dashed amber</text><text x="150" y="234" text-anchor="middle">${r.aimInner?`Inner: dashed red${r.innerPercentage==null?'':` · ${r.innerPercentage}% of bombs`}`:'Inner region unavailable'}</text></svg>`;
+}
+function torpedoDrawing(r,scale,distanceScale=commonDistance([r])) {
+  const minX=Math.min(...r.points.map(p=>p.x)),maxX=Math.max(...r.points.map(p=>p.x));
+  const minZ=Math.min(...r.points.map(p=>p.z)),maxZ=Math.max(...r.points.map(p=>p.z));
+  const zScale=Math.min(scale,12/Math.max(1,maxZ-minZ));
+  const coords=r.points.map(p=>({x:140+(p.x-(minX+maxX)/2)*scale,y:175+(maxZ-p.z)*zScale}));
+  const factor=r.direction==='diverging'?Math.min(1.7,110/Math.max(1,...coords.map(p=>Math.abs(p.x-140)))):r.direction==='converging'?0.4:1;
+  const hasRange=positive(r.rangeDistance)&&positive(distanceScale);
+  const ends=coords.map(p=>({x:140+(p.x-140)*factor,y:hasRange?p.y-r.rangeDistance*140/distanceScale:35}));
+  const armed=r.direction!=='unknown'&&hasRange&&finite(r.armingDistance)&&r.armingDistance<r.rangeDistance;
+  const boundary=coords.map((p,i)=>{const f=hasRange?Math.min(1,(r.armingDistance||0)/r.rangeDistance):0;return{x:p.x+(ends[i].x-p.x)*f,y:p.y+(ends[i].y-p.y)*f};});
+  const left=coords.reduce((b,p,i)=>p.x<coords[b].x?i:b,0),right=coords.reduce((b,p,i)=>p.x>coords[b].x?i:b,0);
+  const xy=p=>p.x.toFixed(2)+','+p.y.toFixed(2);
+  const area=armed?`<polygon fill="#6ed7ad" fill-opacity=".2" points="${[boundary[left],ends[left],ends[right],boundary[right]].map(xy).join(' ')}"/><path class="travel" stroke-dasharray="4 3" d="M ${xy(boundary[left])} L ${xy(boundary[right])}"/>`:'';
+  const lines=r.direction==='unknown'?'':coords.map((p,i)=>`<path class="travel" d="M ${xy(p)} L ${xy(ends[i])}"/>`).join('');
+  const dots=coords.map((p,i)=>{
+    const n=Math.min(r.perPlane,6);
+    return `<g><title>${escapeHtml(JSON.stringify(r.points[i]))}; ${r.perPlane} torpedo(s)</title>${Array.from({length:n},(_,j)=>`<circle cx="${p.x+(j-(n-1)/2)*7}" cy="${p.y}" r="2.7"/>`).join('')}${r.perPlane>6?`<text class="dot-label" x="${p.x}" y="${p.y+15}" text-anchor="middle">×${r.perPlane}</text>`:''}</g>`;
+  }).join('');
+  const axis=hasRange?`<path class="travel" d="M 265 35 V 175 M 261 35 H 269 M 261 175 H 269"/><text x="257" y="29" text-anchor="end">${Number(distanceScale.toFixed(2))} m</text><text x="257" y="190" text-anchor="end">0 m</text>`:'';
+  const reference=r.reference?yamatoDrawing(140,hasRange?175-targetDistance(r,distanceScale)*140/distanceScale:110,120/263,90):'';
+  return `<svg viewBox="0 0 300 240" role="img" aria-label="Estimated torpedo drop layout and arming area" data-distance-scale="${hasRange?distanceScale:0}"><text x="140" y="16" text-anchor="middle">Travel direction</text>${area}${lines}${dots}${reference}${axis}<text x="140" y="210" text-anchor="middle">Drop positions</text><text x="140" y="231" text-anchor="middle">${r.directionSource==='manual user illustration'?'User-selected travel illustration':'Experimental travel illustration'}</text></svg>`;
+}
+// UI
+const items=[];
+const projectiles=new Map();
+const ships=new Map(),aircraftFiles=new Map(),abilities=new Map();
+const results=document.getElementById('results'), status=document.getElementById('status'), filesInput=document.getElementById('files');
+let nextId=1, reading=false,cardView=false,sharedScale=true;
+const fields=rows=>`<table><tbody>${rows.map(([a,b])=>`<tr><th scope="row">${escapeHtml(a)}</th><td>${escapeHtml(b)}</td></tr>`).join('')}</tbody></table>`;
+const dims=d=>d?`${Number(d.width.toFixed(1))} × ${Number(d.height.toFixed(1))} m`:'Not provided';
+function renderDependencies() {
+  const row=(filename,context,text,loaded)=>`<tr><td><code>${escapeHtml(filename)}</code><div class="filename">${escapeHtml(context)}</div></td><td class="${loaded?'file-loaded':'file-required'}">${escapeHtml(text)}</td></tr>`;
+  document.getElementById('dependencies').innerHTML=[...ships.values()].map(ship=>{
+    const references=manifestAircraft(ship,abilities);
+    const rows=references.map(ref=>{
+      const file=aircraftFiles.get(ref.id),weapons=file?weaponReferences(file.raw):[];
+      const context=ref.contexts.join('; ')+(ref.modules?.length?' · '+ref.modules.map(m=>m.role+' / '+m.id).join('; '):'');
+      const referenceOnly=file?.error||items.some(item=>item.name===ref.id&&item.referenceOnlyReason);
+      const state=!file?'Required':referenceOnly?'Loaded · reference only':weapons.length&&weapons.every(id=>projectiles.has(id))?'Aircraft + weapon loaded':'Aircraft loaded';
+      return row(ref.id+'.json',context,state,!!file)+weapons.map(id=>row(id+'.json','Projectile for '+ref.id,projectiles.has(id)?'Loaded':'Required',projectiles.has(id))).join('');
+    }).join('');
+    const related=aircraftAbilities(ship,abilities);
+    const optional=related.length?`<details><summary>Aircraft consumable references (${related.length})</summary><table><tbody>${related.map(ref=>row(ref.id+'.json',ref.slot+' / '+ref.profile,'Aircraft reference confirmed',true)).join('')}</tbody></table></details>`:'';
+    return `<section class="dependency-panel"><div class="result-header"><h2>${escapeHtml(ship.name)}</h2><button type="button" data-remove-ship="${escapeHtml(ship.name)}" aria-label="Remove ship ${escapeHtml(ship.name)}">×</button></div><p class="filename">${escapeHtml(ship.filename)}</p><details${cardView?'':' open'}><summary>Required files (${references.length} aircraft)</summary>${rows?`<table><tbody>${rows}</tbody></table>`:'<p>No direct aircraft references.</p>'}${optional}</details></section>`;
+  }).join('');
+}
+function render() {
+  const scale=commonScale(items);
+  for(const r of items)r.referenceOnlyReason=referenceOnlyReason(r,[...ships.values()],abilities,projectiles);
+  for(const r of items)if(r.kind==='torpedo')attachTorpedoWeapon(r,projectiles.get(r.projectile));
+  for(const r of items)if(r.kind==='airstrike') {
+    const weapon=projectiles.get(r.projectile);attachAirstrikeWeapon(r,weapon);
+    r.timingRanges=airstrikeTimingRanges(r,[...ships.values()],weapon);
+  }
+  const distanceScale=commonDistance(items);
+  const airstrikeExtent=Math.max(1,...items.filter(r=>r.kind==='airstrike').flatMap(r=>[r.outer.width,r.outer.height,r.reference?263:1]));
+  const metricExtent=cardView&&sharedScale?commonMetricExtent(items):null;
+  results.className=cardView?'comparison-cards':'';
+  document.getElementById('compare').setAttribute('aria-pressed',String(cardView));
+  document.getElementById('scale-option').hidden=!cardView;
+  document.getElementById('scale-note').hidden=!cardView;
+  renderDependencies();
+  results.innerHTML=items.length?items.map(r=>{
+    const required=r.projectile?String(r.projectile)+'.json':null;
+    const missing=required?'Load referenced projectile: '+required:'Aircraft has no referenced projectile ID';
+    const connection=r.kind==='torpedo'?`<p class="${r.weapon?'drawing-note':'warning'}">${r.weapon?'Matched projectile: ':'Required torpedo file: '}<strong>${escapeHtml(required||'No reference in aircraft JSON')}</strong>${r.weapon?'':'<br>Only a matching internal projectile ID is used; other torpedoes are not applied.'}</p>`:'';
+    const details=r.referenceOnlyReason?fields([['Status',r.referenceOnlyReason],['Required weapon file',required||'Not provided']]):r.kind==='airstrike'?fields([...airstrikeTimingRows(r),['Overall drop envelope',dims(r.outer)],['Inner-region envelope (estimate)',dims(r.inner)],['Bombs per attack',r.payload?.count??'Not provided'],['Aircraft × payload × releases',r.payload?`${r.payload.aircraft} × ${r.payload.perRelease} × ${r.payload.releases}`:'Not provided'],['Release interval',r.raw.attackInterval+' s'],['Bomb allocation to inner region',r.innerPercentage==null?'Not provided':r.innerPercentage+'%'],['Required bomb file',required||'No reference'],['Weapon verification',r.weaponVerified?r.ammo:r.excluded?'Excluded: ASW / unsupported weapon':'Load matching Projectile JSON']]):r.kind==='bomb'?fields([['Minimum aiming outline',dims(r.aimMinimum)],['Maximum aiming outline',dims(r.outer)],['Inner bomb region (fully aimed)',dims(r.aimInner)],['Bombs assigned to distribution region',r.innerPercentage==null?'Not provided':r.innerPercentage+'%'],['Movement offset',r.offset+' m'],['Spread aspect ratio',Number(r.ratio.toFixed(4))],['Referenced projectile',r.projectile || 'Not provided']]):fields([['Torpedoes per strike',r.total],['Aircraft × payload × releases',`${r.planes} × ${r.perPlane} × ${r.releases}`],['Arming distance',r.armingDistance==null?missing:Math.round(r.armingDistance)+' m'],['Range',r.rangeDistance==null?missing:Number((r.rangeDistance/1000).toFixed(2))+' km'],['Formation rows',r.rows],['Referenced projectile',required || 'Not provided']]);
+    const formula=r.kind==='airstrike'?`Aircraft flag: isAirSupportPlane = true\nShip-reference width = 30 × outerSalvoSizeX × minSpreadX\nLength = 30 × outerSalvoSizeZ × minSpreadZ + movement\nMovement uses speedMoveWithBomb × 1852 / 3600 × 2.61 × throttle limit × (attackCount - 1) × attackInterval\nminSpread = ${JSON.stringify(r.raw.minSpread)}; throttleAcceleration = ${r.raw.throttleAcceleration}; speedMax = ${r.raw.speedMax}`:r.kind==='bomb'?`Width = round(60 × salvoX)\nHeight = round(60 × ${r.ratio} × salvoY) + ${r.offset}\nMinimum width = maximum width × minSpreadX / maxSpreadX\nMinimum height = maximum base height × minSpreadY / maxSpreadY + offset\nminSpread = ${JSON.stringify(r.raw.minSpread)}; maxSpread = ${JSON.stringify(r.raw.maxSpread)}\nOffset = round(2.69 × ${r.raw.speedMoveWithBomb} × (${r.raw.attackCount} − 1) × ${r.raw.attackInterval})`:`formations.attack[1]\n${JSON.stringify(r.raw.formations.attack[1],null,2)}`;
+    const localDistance=cardView&&!sharedScale?commonDistance([r]):distanceScale;
+    const drawing=r.referenceOnlyReason?`<svg viewBox="0 0 300 240" role="img" aria-label="Aircraft reference only"><text x="150" y="112" text-anchor="middle">${escapeHtml(r.referenceOnlyReason)}</text></svg>`:r.kind==='airstrike'?airstrikeDrawing(r,metricExtent||(cardView&&!sharedScale?Math.max(r.outer.width,r.outer.height,r.reference?263:1):airstrikeExtent)):r.kind==='bomb'?bombDrawing(r,metricExtent):torpedoDrawing(r,cardView&&!sharedScale?commonScale([r]):scale,localDistance);
+    return `<article data-id="${r.id}"><div class="result-header"><div><span class="badge">${r.referenceOnlyReason?'AIRCRAFT REFERENCE':r.kind==='airstrike'?'AIRSTRIKE · EXPERIMENTAL':r.kind==='bomb'?'BOMB ELLIPSE ESTIMATE':'TORPEDO DROP LAYOUT · ESTIMATED'}</span><h2>${escapeHtml(r.name)}</h2><div class="filename">${escapeHtml(r.filename)}</div></div><button type="button" data-remove="${r.id}" aria-label="Remove ${escapeHtml(r.name)}" title="Remove">×</button></div><div class="result-grid"><div class="visual">${referenceControls(r)}<div class="drawing-wrap">${drawing}${r.kind==='torpedo'&&r.reference&&positive(localDistance)?`<label class="distance-control"><span>Target distance</span><input type="range" min="0" max="${localDistance}" step="1" value="${targetDistance(r,localDistance)}" data-distance="${r.id}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(r,localDistance))} m</output></label>`:''}</div>${r.kind==='torpedo'?`<p class="drawing-note">${r.armingDistance!=null&&r.rangeDistance!=null?'Blank: unarmed · Green: armed':'Distance data unavailable until the required projectile is loaded.'}${r.reference?' · Yamato enlarged; not to scale.':''}</p><details><summary>Adjust illustration</summary><label class="travel-control">Travel lines<select data-direction="${r.id}"><option value="auto" ${r.directionSource!=='manual user illustration'?'selected':''}>Automatic estimate</option>${[['unknown','None'],['parallel','Parallel'],['diverging','Diverging / fan'],['converging','Converging / reverse fan']].map(([v,t])=>`<option value="${v}" ${r.directionSource==='manual user illustration'&&r.direction===v?'selected':''}>${t} (manual)</option>`).join('')}</select></label></details>`:''}</div><div class="detail">${cardView?'<details class="card-data"><summary>Data</summary>':''}${connection}${details}${r.warnings.map(w=>`<p class="warning">${escapeHtml(w)}</p>`).join('')}<details><summary>Calculation inputs</summary><pre>${escapeHtml(formula)}</pre></details>${cardView?'</details>':''}</div></div></article>`;
+  }).join(''):'<p class="empty">No aircraft loaded.</p>';
+  document.getElementById('export').disabled=!items.length&&!ships.size;
+  document.getElementById('clear').disabled=(!items.length&&!projectiles.size&&!ships.size&&!aircraftFiles.size&&!abilities.size) || reading;
+}
+async function loadFiles(list) {
+  if(reading) { status.textContent='Still reading the previous selection.'; return; }
+  reading=true; document.getElementById('clear').disabled=true;
+  const selected=Array.from(list), messages=[];
+  if(selected.length>32) messages.push('Only the first 32 files are processed.');
+  status.textContent='Reading files…';
+  for(const file of selected.slice(0,32)) {
+    try {
+      if(file.size>10*1024*1024) throw Error('File exceeds the 10 MB limit.');
+      const text=await file.text();
+      const parsed=parseAircraftJson(text),data=parsed.data;
+      if(data?.typeinfo?.type==='Ship') {
+        const manifest=shipManifest(data,file.name);
+        if(!ships.has(manifest.name)&&ships.size>=20)throw Error('Ship reference limit reached (20).');
+        ships.set(manifest.name,manifest);continue;
+      }
+      if(data?.typeinfo?.type==='Ability') {
+        if(!validId(data.name))throw Error('Ability has no valid internal name ID.');
+        if(!abilities.has(data.name)&&abilities.size>=100)throw Error('Ability limit reached (100).');
+        abilities.set(data.name,data);continue;
+      }
+      if(data?.typeinfo?.type==='Projectile') {
+        if(!['torpedo','HE','AP','CS','SAP','depthcharge','DC'].includes(data.ammoType)&&!['torpedo','bomb','depthcharge'].includes(data.planeAmmoType))throw Error('Unsupported Projectile type.');
+        if(typeof data.name!=='string'||!data.name.trim())throw Error('Projectile has no internal name ID; filename alone cannot establish a match.');
+        const id=data.name;
+        if(!projectiles.has(id)&&projectiles.size>=100)throw Error('Projectile limit reached (100).');
+        if(projectiles.has(id))messages.push(id+': previous projectile replaced; use files from one dataset version.');
+        projectiles.set(id,data);continue;
+      }
+      let r;
+      try {r=analyze(data,file.name);} catch(error) {
+        if(data?.typeinfo?.type!=='Aircraft'||!validId(data.name))throw error;
+        if(!aircraftFiles.has(data.name)&&aircraftFiles.size>=100)throw Error('Aircraft file limit reached (100).');
+        aircraftFiles.set(data.name,{raw:data,filename:file.name,error:error.message});
+        messages.push(file.name+': '+error.message+' File retained for ship references.');continue;
+      }
+      if(items.length>=100)throw Error('Result limit reached (100).');
+      if(validId(data.name)) {
+        if(!aircraftFiles.has(data.name)&&aircraftFiles.size>=100)throw Error('Aircraft file limit reached (100).');
+        aircraftFiles.set(data.name,{raw:data,filename:file.name});
+      }
+      r.id=nextId++;items.push(r);
+    } catch(e) { messages.push(file.name+': '+e.message); }
+  }
+  reading=false;render();filesInput.value='';
+  const unused=[...projectiles.keys()].filter(id=>!items.some(r=>r.projectile===id)&&![...aircraftFiles.values()].some(file=>weaponReferences(file.raw).includes(id)));
+  if(unused.length)messages.push('Not applied (no matching aircraft reference): '+unused.map(id=>id+'.json').join(', '));
+  status.textContent=messages.length?messages.join(' | '):`${ships.size} ship(s), ${aircraftFiles.size} aircraft, ${projectiles.size} projectile(s) and ${abilities.size} Ability file(s) loaded.`;
+}
+document.getElementById('compare').onclick=()=>{cardView=!cardView;render();document.getElementById('compare').focus();};
+document.getElementById('shared-scale').onchange=e=>{sharedScale=e.target.checked;render();};
+document.getElementById('dependencies').addEventListener('click',e=>{const button=e.target.closest('[data-remove-ship]');if(!button)return;ships.delete(button.dataset.removeShip);render();});
+document.getElementById('open').onclick=document.getElementById('browse').onclick=()=>filesInput.click();
+filesInput.onchange=()=>loadFiles(filesInput.files);
+const drop=document.getElementById('drop');
+document.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget)drop.classList.remove('over');});
+document.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');loadFiles(e.dataTransfer.files);});
+results.addEventListener('click',e=>{
+  const simulation=e.target.closest('[data-airstrike-play], [data-airstrike-clear]');
+  if(simulation&&(simulation.dataset.airstrikePlay||simulation.dataset.airstrikeClear)){if(simulation.disabled)return;const r=items.find(r=>r.id===Number(simulation.dataset.airstrikePlay||simulation.dataset.airstrikeClear));if(!r||r.kind!=='airstrike')return;if(simulation.dataset.airstrikeClear)r.attack=null;else{const points=simulateAirstrike(r);if(!points.length)return;r.attack={points,startedAt:Date.now()};}render();results.querySelector(`[${simulation.dataset.airstrikePlay?'data-airstrike-play':'data-airstrike-clear'}="${r.id}"]`)?.focus();return;}
+  const control=e.target.closest('[data-reference], [data-rotate]');
+  if(control){const r=items.find(r=>r.id===Number(control.dataset.reference||control.dataset.rotate));if(!r)return;if(control.dataset.reference)r.reference=!r.reference;else r.rotation=r.rotation?0:90;render();results.querySelector(`[${control.dataset.reference?'data-reference':'data-rotate'}="${r.id}"]`)?.focus();return;}
+  const b=e.target.closest('[data-remove]');if(!b)return;const i=items.findIndex(r=>r.id===Number(b.dataset.remove));if(i>=0)items.splice(i,1);render();document.getElementById('open').focus();
+});
+results.addEventListener('input',e=>{
+  if(!e.target.matches('[data-distance]'))return;
+  const r=items.find(r=>r.id===Number(e.target.dataset.distance));if(!r)return;
+  const distanceScale=cardView&&!sharedScale?commonDistance([r]):commonDistance(items);r.targetDistance=Math.max(0,Math.min(distanceScale,Number(e.target.value)));
+  const article=e.target.closest('article'),target=article.querySelector('.yamato-target');
+  if(target)target.setAttribute('transform',`translate(140 ${175-targetDistance(r,distanceScale)*140/distanceScale}) rotate(90)`);
+  article.querySelector('output').textContent=Math.round(targetDistance(r,distanceScale))+' m';
+});
+results.addEventListener('change',e=>{const id=Number(e.target.dataset.direction),r=items.find(r=>r.id===id);if(!r)return;const direction=e.target.value;if(!['auto','unknown','parallel','diverging','converging'].includes(direction))return;r.direction=direction==='auto'?estimatedDirection(r):direction;r.directionSource=direction==='auto'?'experimental estimate':'manual user illustration';render();results.querySelector(`[data-direction="${id}"]`)?.focus();});
+document.getElementById('clear').onclick=()=>{if(reading)return;items.length=0;projectiles.clear();ships.clear();aircraftFiles.clear();abilities.clear();render();status.textContent='Cleared.';document.getElementById('open').focus();};
+document.getElementById('export').onclick=()=>{const output={tool:'Aircraft Pattern Viewer',schema:6,exportedAt:new Date().toISOString(),view:{cards:cardView,sameScale:sharedScale},ships:[...ships.values()].map(ship=>({...ship,aircraft:manifestAircraft(ship,abilities)})),loadedAircraft:[...aircraftFiles.keys()],notes:'Estimates are unverified. Bomb outer is the maximum aiming outline; aimMinimum is the minimum. inner is maximum-state distribution; aimInner is fully aimed distribution, not hit probability. Airstrike outer/inner are experimental ship-scale swept envelopes at capped approach speed and default timescale, not legacy reticle-size stats. Airstrike points are illustrative, not game RNG; formation spacing and fall time are omitted. Weapon verification requires the matching internal projectile ID and excludes DC. Torpedo range/arming use matched Projectile data; horizontal spacing and travel are schematic.',results:items.map(({raw,id,...r})=>r)};const blob=new Blob([JSON.stringify(output,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='aircraft-pattern-results.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+</script>
+</body>
+</html>

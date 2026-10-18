@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Compare World of Warships and Korabli bomber reticles, airstrike areas and torpedo drop patterns.">
+<title>WoWS-Korabli Air Armament Reticle</title>
+<link rel="stylesheet" href="./assets/{{site.css}}">
+</head>
+<body>
+<header class="app-header">
+  <div class="brand"><span class="brand-mark" data-icon="Crosshair"></span><h1>WoWS-Korabli <span>Air Armament Reticle</span></h1></div>
+  <div class="game-switch" role="group" aria-label="Game"><button type="button" data-game="wows" aria-pressed="false">World of Warships</button><button type="button" data-game="korabli" aria-pressed="true">Korabli</button></div>
+  <div class="header-actions">
+    <button id="open" class="icon-button" type="button" title="Import JSON files" aria-label="Import JSON files" data-icon="Upload"></button>
+    <button id="export" class="icon-button" type="button" title="Export comparison" aria-label="Export comparison" data-icon="Download" disabled></button>
+    <button id="share" class="command" type="button" disabled><span data-icon="Copy"></span>Share</button>
+  </div>
+</header>
+<div class="workbench">
+  <section class="library" aria-label="Ship and aircraft selection">
+    <div class="library-heading"><h2>Ship selection</h2><span id="library-count"></span></div>
+    <div class="dataset"><span class="dataset-dot"></span><span id="dataset">Loading dataset…</span></div>
+    <div id="ship-editors" class="ship-editors"></div>
+    <button id="add-ship" class="primary command add-ship" type="button" disabled><span data-icon="Plus"></span>Add Ship</button>
+    <p class="library-footnote">Repository data · <span id="snapshot"></span></p>
+  </section>
+  <main class="comparison">
+    <div class="comparison-heading"><div><h2>Comparison <span id="comparison-count">0</span></h2><p id="comparison-subtitle">Air armament geometry</p></div><div class="comparison-tools">
+      <label class="scale-toggle"><input id="shared-scale" type="checkbox" checked>Same scale</label>
+      <div class="view-switch" role="group" aria-label="Comparison layout"><button id="cards-view" class="icon-button" type="button" aria-label="Card view" title="Card view" aria-pressed="true" data-icon="LayoutGrid"></button><button id="list-view" class="icon-button" type="button" aria-label="List view" title="List view" aria-pressed="false" data-icon="Rows3"></button></div>
+      <button id="clear" class="icon-button" type="button" aria-label="Clear comparison" title="Clear comparison" data-icon="Trash2" disabled></button>
+    </div></div>
+    <div id="comparison-tabs" class="comparison-tabs" role="tablist" aria-label="Comparison armament"></div>
+    <div class="legend"><div id="legend-items"></div><button id="notes" class="icon-button" type="button" title="Calculation notes" aria-label="Calculation notes" data-icon="Info"></button></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <div id="results" class="comparison-cards" aria-busy="true"><div class="empty-state">Loading aircraft data…</div></div>
+    <footer><span>Unofficial · Experimental estimates · Not hit probability</span><span>Torpedo spacing is schematic; its distance scale is separate.</span></footer>
+  </main>
+</div>
+<dialog id="import-dialog"><div class="dialog-heading"><h2>Import JSON</h2><button class="icon-button" type="button" data-close="import-dialog" title="Close" aria-label="Close import" data-icon="X"></button></div><div id="drop" class="drop-area"><span data-icon="Upload"></span><strong>Ship · Aircraft · Projectile</strong><button id="browse" class="command" type="button">Choose JSON files</button></div><input id="files" type="file" accept=".json,application/json" multiple><div id="import-status" class="status" role="status"></div></dialog>
+<dialog id="modifiers-dialog" aria-labelledby="modifiers-title"><form id="modifiers-form"><div class="dialog-heading"><h2 id="modifiers-title">Modifiers</h2><button class="icon-button" type="button" data-close="modifiers-dialog" title="Close" aria-label="Close modifiers" data-icon="X"></button></div><div id="modifier-fields"></div><p id="modifier-error" class="status error" role="alert"></p><div class="modifier-actions"><button type="button" id="reset-modifiers">Reset to original</button><button type="submit" class="primary">Apply</button></div></form></dialog>
+<dialog id="notes-dialog"><div class="dialog-heading"><h2>Calculation notes</h2><button class="icon-button" type="button" data-close="notes-dialog" title="Close" aria-label="Close notes" data-icon="X"></button></div><p>Default speed and time scale. Build effects, terrain and actual game RNG are not reproduced.</p><p>Same scale applies within each armament tab. Bombers and airstrikes use meters. Torpedo diagrams share a range axis; horizontal spacing and the enlarged Yamato reference are schematic.</p><p>Airstrike flight time is activation to first impact at minimum and maximum range. Release animations are pattern previews, not real-time countdowns. Inner distribution regions are estimates, not hit probability.</p><p>Yamato reference: 263 × 38.9 m. No game JSON datasets are bundled with this skeleton.</p></dialog>
+<script src="./assets/{{viewer.js}}"></script>
+<script src="./assets/{{icons.js}}"></script>
+<script src="./assets/{{site.js}}" data-catalog="./assets/{{catalog}}"></script>
+</body>
+</html>
