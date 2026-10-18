@@ -1,6 +1,6 @@
 # WoWS-Korabli Air Armament Reticle
 
-A static comparison tool for aircraft weapon aiming areas, built for GitHub Pages.
+A static comparison tool for aircraft weapon aiming areas inspired by jcw780's wows ballistics, built for GitHub Pages.
 
 ## https://ch0m1n.github.io/Air-Armament-Reticle/
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
