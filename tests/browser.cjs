@@ -20,7 +20,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.reload();await page.waitForFunction(()=>!busy);assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
     await page.screenshot({path:path.join(artifacts,'empty-dark.png'),fullPage:true});
     await page.locator('#theme-toggle').click();
-    for(const kind of ['attack','skip']){
+    for(const kind of ['skip']){
       await page.locator('#comparison-tab-'+kind).click();
       const panel=page.locator('#comparison-'+kind);assert((await panel.innerText()).includes('Under the Maintenance!'));
       assert(await panel.locator('img').evaluate(image=>image.complete&&image.naturalWidth>0));
@@ -43,7 +43,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     // Fixtures are invented values, generated only in an ignored temporary test site.
     fs.cpSync(path.join(root,'src'),path.join(fixture,'src'),{recursive:true});fs.mkdirSync(path.join(fixture,'tools'));
     for(const name of ['build.mjs','reindex.mjs','preview.mjs'])fs.copyFileSync(path.join(root,'tools',name),path.join(fixture,'tools',name));
-    const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version);
+    const {writeFixtureDataset}=await import('./fixtures.mjs');for(const [game,version]of [['KORABLI','fixture-A'],['KORABLI','fixture-B'],['WOWS','fixture-A']])writeFixtureDataset(fixture,game,version,true);
     const wowsBombPath=path.join(fixture,'GAME/WOWS/fixture-A/Aircraft/TEST_BOMBER.json');
     const wowsBomb=JSON.parse(fs.readFileSync(wowsBombPath));wowsBomb.outerSalvoSize[0]=3;fs.writeFileSync(wowsBombPath,JSON.stringify(wowsBomb));
     for(const tool of ['reindex.mjs','build.mjs']){const result=spawnSync(process.execPath,[path.join(fixture,'tools',tool)],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
@@ -110,7 +110,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
         return values;
       }finally{catalog.entries=saved;renderLibrary();}
     }),['','bomb']);
-    assert.deepEqual(await first.locator('[data-field="role"] option').evaluateAll(options=>options.map(o=>o.value)),['','bomb','torpedo','airstrike']);
+    assert.deepEqual(await first.locator('[data-field="role"] option').evaluateAll(options=>options.map(o=>o.value)),['','bomb','torpedo','airstrike','attack']);
     assert.deepEqual(await page.evaluate(()=>{
       const saved=catalog.entries;
       try{
@@ -164,7 +164,24 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     assert.equal(await first.getByRole('textbox',{name:'Ship name',exact:true}).inputValue(),'Cross-game test');
     await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:path.join(artifacts,'mixed-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(artifacts,'mixed-mobile.png'),fullPage:true});
-    assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import and responsive tests');
+    await page.setViewportSize({width:1440,height:1000});
+    await first.locator('[data-field="role"]').selectOption('attack');await page.waitForFunction(()=>!busy);
+    await first.locator('[data-field="entryId"]').selectOption({label:'TEST_ATTACK'});await page.waitForFunction(()=>!busy);
+    await page.locator('#comparison-tab-attack').click();
+    const attackCard=page.locator('#comparison-attack article').first();
+    assert((await attackCard.innerText()).includes('Experimental bomber approximation'));
+    assert.equal(await attackCard.locator('.ellipse-maximum').count(),1);
+    assert.equal(await attackCard.locator('.ellipse-outer').count(),1);
+    assert.equal(await attackCard.locator('.ellipse-distribution').count(),0);
+    assert.equal(await attackCard.locator('[data-action="play"]').count(),0);
+    await attackCard.locator('[data-action="expand"]').click();
+    assert((await drawingDialog.innerText()).includes('rocket scale unverified'));
+    await page.screenshot({path:path.join(artifacts,'expanded-attack-desktop.png')});
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({width:390,height:844});await attackCard.scrollIntoViewIfNeeded();
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.screenshot({path:path.join(artifacts,'attack-mobile.png')});
+    assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import, attack outlines and responsive tests');
   }finally{
     if(browser)await browser.close();
     for(const server of servers)if(server.exitCode===null){const stopped=new Promise(resolve=>server.once('exit',resolve));server.kill();await stopped;}

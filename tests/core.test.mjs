@@ -75,10 +75,20 @@ test('viewer script parses; private imports cannot be shared as catalog entries'
   assert(fs.readFileSync(path.join(root,'src/site.js'),'utf8').includes('selections.some(item=>!item.catalogId)'));
 });
 
-test('reserved aircraft types cannot use generic bomb or torpedo estimates',()=>{
+test('attack aircraft require verified rocket identity; skip geometry remains excluded',()=>{
   const entry=catalog.entries.find(entry=>entry.role==='bomb'),plane=read(entry.files[1]);
   assert.throws(()=>core.analyze({...plane,rocketName:'TEST_ROCKET'},'attack.json'),/Attack aircraft/);
   assert.throws(()=>core.analyze({...plane,typeinfo:{...plane.typeinfo,species:'Skip'}},'skip.json'),/Skip-bomber/);
+  const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
+  const attack=core.analyze({...plane,bombName:'TEST_ROCKET'},'attack.json',weapon);
+  assert.equal(attack.kind,'attack');assert(attack.warnings.some(w=>w.includes('not validated for rockets')));
+  const explicit=core.analyze({...plane,bombName:null,rocketName:'TEST_ROCKET'},'attack.json',weapon);
+  assert.equal(explicit.kind,'attack');
+  assert.throws(()=>core.analyze({...plane,rocketName:'OTHER'},'attack.json',weapon),/matching Rocket/);
+  assert(core.bombDrawing(attack).includes('rocket scale unverified'));
+  assert(!core.bombDrawing(attack).includes('ellipse-distribution'));
+  const changed=core.modifiedInputs('attack',attack.raw,weapon,{'aircraft:outerSalvoSize:0':4});
+  assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,240);
 });
 
 test('modifiers use a numeric allowlist and never mutate repository inputs',()=>{

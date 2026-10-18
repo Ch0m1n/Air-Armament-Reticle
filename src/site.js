@@ -2,7 +2,7 @@ const siteCatalogUrl=document.currentScript.dataset.catalog;
 const ui=id=>document.getElementById(id);
 const selections=[],jsonCache=new Map(),uploadedShips=new Map(),uploadedAircraft=new Map(),uploadedWeapons=new Map();
 const roleNames={bomb:'Bombers',torpedo:'Torpedo bombers',airstrike:'Airstrike',attack:'Attack aircraft',skip:'Skip bombers'};
-const supportedRoles=new Set(['bomb','torpedo','airstrike']);
+const supportedRoles=new Set(['bomb','torpedo','airstrike','attack']);
 let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
 let activeGame='korabli',activeVersion='';
 let comparisonRole='bomb';
@@ -94,6 +94,7 @@ function defaultEntries(){return activeGame==='mixed'?actualGames.flatMap(game=>
 const dimension=value=>value?`${Number(value.width.toFixed(1))} × ${Number(value.height.toFixed(1))} m`:'N/A';
 function comparisonMetrics(item) {
   const source=activeGame==='mixed'&&item.version?[['Version',item.version]]:[];
+  if(item.kind==='attack')return [...source,['Minimum aim (estimate)',dimension(item.aimMinimum)],['Maximum aim (estimate)',dimension(item.outer)],['Model','Experimental bomber approximation']];
   if(item.kind==='bomb')return [...source,['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
   if(item.kind==='torpedo'){
     const sector=torpedoSector(item);
@@ -116,7 +117,7 @@ function cardTools(item) {
 }
 function renderComparisonTabs() {
   ui('comparison-tabs').innerHTML=Object.entries(roleNames).map(([kind,label])=>`<button type="button" id="comparison-tab-${kind}" role="tab" data-comparison-tab="${kind}" aria-controls="comparison-${kind}" aria-selected="${kind===comparisonRole}" tabindex="${kind===comparisonRole?0:-1}">${label}<small>${selections.filter(item=>item.kind===kind).length}</small></button>`).join('');
-  const entries=!supportedRoles.has(comparisonRole)?[]:comparisonRole==='torpedo'?[['unarmed','Unarmed'],['minimum','Armed']]:comparisonRole==='bomb'?[['minimum','Minimum aim'],['maximum','Maximum aim'],['inner','Inner region']]:[['minimum','Drop area'],['inner','Inner region']];
+  const entries=!supportedRoles.has(comparisonRole)?[]:comparisonRole==='torpedo'?[['unarmed','Unarmed'],['minimum','Armed']]:comparisonRole==='attack'?[['minimum','Minimum aim (estimate)'],['maximum','Maximum aim (estimate)']]:comparisonRole==='bomb'?[['minimum','Minimum aim'],['maximum','Maximum aim'],['inner','Inner region']]:[['minimum','Drop area'],['inner','Inner region']];
   ui('legend-items').innerHTML=entries.map(([kind,label])=>`<span><i class="swatch ${kind}"></i>${label}</span>`).join('');
 }
 function selectComparisonRole(kind,focus=false) {
@@ -142,7 +143,7 @@ function renderComparison(focus=null) {
     const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members);
     const cards=members.map(item=>{
     const range=sharedScale?torpedoExtent:commonDistance([item]);
-    const drawing=item.kind==='bomb'?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item]),range);
+    const drawing=['bomb','attack'].includes(item.kind)?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item]),range);
     const targetRange=item.rangeDistance||range;
     const distance=item.kind==='torpedo'&&item.reference&&targetRange>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${targetRange}" step="1" value="${targetDistance(item,targetRange)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,targetRange))} m</output></label>`:'';
     return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap" data-expand="${item.id}">${drawing}${distance}<button class="drawing-expand icon-button" type="button" data-action="expand" data-id="${item.id}" title="Enlarge chart" aria-label="Enlarge chart">${glyph('Search')}</button></div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
@@ -203,10 +204,10 @@ async function addEntry(id,slot=null) {
   if(!old&&selections.length>=12)throw Error('Comparison limit reached (12).');
   const [ship,plane,weapon]=await Promise.all(entry.files.map(repositoryJson));
   if(ship.name!==entry.shipId||plane.name!==entry.aircraft)throw Error('Repository identity mismatch');
-  const base=analyze(plane,plane.name+'.json');if(base.projectile!==weapon.name)throw Error('Weapon reference mismatch');
+  const base=analyze(plane,plane.name+'.json',weapon);if(base.projectile!==weapon.name)throw Error('Weapon reference mismatch');
   const overrides=old&&old.catalogId!==entry.id?{}:slot?.modifiers||{};
   const modified=modifiedInputs(base.kind,plane,weapon,overrides);
-  const item=analyze(modified.aircraft,plane.name+'.json');
+  const item=analyze(modified.aircraft,plane.name+'.json',modified.projectile);
   attachData(item,modified.projectile,[shipManifest(ship,ship.name+'.json')]);
   if(!slot){slot=slotFromEntry(entry);shipSlots.push(slot);}
   slot.modifiers=modified.overrides;
@@ -435,7 +436,8 @@ async function importFiles(list) {
       try {
         const old=selections.find(item=>!item.catalogId&&item.name===name);
         if(!old&&selections.length>=12)continue;
-        const item=analyze(file.raw,file.filename);attachData(item,uploadedWeapons.get(item.projectile),[...uploadedShips.values()]);
+        const weapon=uploadedWeapons.get(file.raw.torpedoName||file.raw.bombName||file.raw.rocketName||file.raw.shellName);
+        const item=analyze(file.raw,file.filename,weapon);attachData(item,weapon,[...uploadedShips.values()]);
         if(item.kind==='airstrike'&&item.excluded){if(old)selections.splice(selections.indexOf(old),1);continue;}
         Object.assign(item,{id:old?.id||nextSelection++,game:activeGame,reference:old?.reference??true,rotation:old?.rotation||0,shipLabel:[...uploadedShips.values()].find(ship=>manifestAircraft(ship,new Map()).some(ref=>ref.id===name))?.name||'Uploaded aircraft'});
         if(old)selections[selections.indexOf(old)]=item;else selections.push(item);

@@ -101,9 +101,9 @@ test('preview selects only connected supported JSON and excludes ASW and unrelat
   fs.writeFileSync(path.join(folder,'Aircraft/TEST_ROCKET_PLANE.json'),JSON.stringify({...aircraft,name:'TEST_ROCKET_PLANE',bombName:'TEST_ROCKET'}));
   fs.writeFileSync(path.join(folder,'Projectiles/TEST_ROCKET.json'),JSON.stringify({name:'TEST_ROCKET',typeinfo:{type:'Projectile',species:'Rocket'},ammoType:'HE',planeAmmoType:'rocket'}));
   const plan=collectDataset({...options,source:folder});
-  assert.deepEqual(plan.summary.counts,{Ships:1,Aircraft:4,Projectiles:2});assert.equal(plan.summary.configurations,4);
-  assert.equal(plan.summary.skippedAircraft,2);assert(plan.summary.warnings.some(w=>w.includes('ASW/DC')));assert(plan.summary.warnings.some(w=>w.includes('Rocket aircraft')));
-  assert.equal(plan.files.size,7);assert(![...plan.files.keys()].some(file=>/UNREFERENCED|credentials|TEST_DC|TEST_ASW/.test(file)));
+  assert.deepEqual(plan.summary.counts,{Ships:1,Aircraft:5,Projectiles:3});assert.equal(plan.summary.configurations,5);
+  assert.equal(plan.summary.skippedAircraft,1);assert(plan.summary.warnings.some(w=>w.includes('ASW/DC')));
+  assert.equal(plan.files.size,9);assert(![...plan.files.keys()].some(file=>/UNREFERENCED|credentials|TEST_DC|TEST_ASW/.test(file)));
   assert.equal(plan.summary.repository,repository);
 });
 test('source folders may use singular names; traversal and reserved versions are rejected',()=>{

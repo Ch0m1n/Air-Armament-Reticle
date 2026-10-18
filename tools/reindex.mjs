@@ -28,10 +28,11 @@ for(const [folder,game]of [['WOWS','wows'],['KORABLI','korabli']]) {
       if(['disabled','preserved'].includes(String(ship.group||'').toLowerCase()))continue;
       for(const ref of core.shipManifest(ship,filename).aircraft) {
         const planeFile=fileFor('Aircraft',ref.id);if(!planeFile)continue;
-        const plane=read(planeFile);let result;try{result=core.analyze(plane,ref.id+'.json');}catch{continue;}
-        if(!['bomb','torpedo','airstrike'].includes(result.kind))continue;
-        const weaponFile=fileFor('Projectiles',result.projectile);if(!weaponFile)continue;
-        const weapon=read(weaponFile);if(weapon.name!==result.projectile||plane.name!==ref.id)throw Error('Internal ID mismatch: '+planeFile);
+        const plane=read(planeFile),weaponId=plane.torpedoName||plane.bombName||plane.rocketName||plane.shellName;
+        const weaponFile=fileFor('Projectiles',weaponId);if(!weaponFile)continue;
+        const weapon=read(weaponFile);let result;try{result=core.analyze(plane,ref.id+'.json',weapon);}catch{continue;}
+        if(!['bomb','torpedo','airstrike','attack'].includes(result.kind))continue;
+        if(weapon.name!==result.projectile||plane.name!==ref.id)throw Error('Internal ID mismatch: '+planeFile);
         if(result.kind==='airstrike'){core.attachAirstrikeWeapon(result,weapon);if(!result.weaponVerified)continue;}
         const files=[shipFile,planeFile,weaponFile],legacyId=code+'--'+plane.name;
         for(const file of files)hashes[file]=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex');

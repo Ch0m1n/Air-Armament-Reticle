@@ -78,9 +78,8 @@ export function collectDataset({source,game,version,onProgress=()=>{},shipSubset
         const weapon=read('Projectiles',projectile);
         // Classify the weapon before geometry: ASW aircraft may not have bomber reticle inputs.
         if(['DC','depthcharge'].includes(weapon.ammoType)||weapon.planeAmmoType==='depthcharge'||weapon.typeinfo?.species==='DepthCharge')throw Object.assign(Error('ASW/DC excluded'),{exclusion:'asw'});
-        if(weapon.planeAmmoType==='rocket'||weapon.typeinfo?.species==='Rocket')throw Error('Rocket aircraft geometry is not supported yet');
-        const result=core.analyze(plane,reference.id+'.json');
-        if(result.projectile!==projectile||!['bomb','torpedo','airstrike'].includes(result.kind))throw Error('Unsupported geometry');
+        const result=core.analyze(plane,reference.id+'.json',weapon);
+        if(result.projectile!==projectile||!['bomb','torpedo','airstrike','attack'].includes(result.kind))throw Error('Unsupported geometry');
         if(result.kind==='airstrike'){core.attachAirstrikeWeapon(result,weapon);if(!result.weaponVerified)throw Error('Unverified airstrike weapon');}
         if(result.kind==='torpedo'&&weapon.ammoType!=='torpedo'&&weapon.planeAmmoType!=='torpedo')throw Error('Torpedo weapon mismatch');
         if(core.referenceOnlyReason(result,[manifest],new Map(),new Map([[weapon.name,weapon]])))throw Error('Unsupported air-support reference');
