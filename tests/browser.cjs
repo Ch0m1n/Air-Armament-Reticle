@@ -62,6 +62,9 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.locator('#comparison-tab-airstrike').click();
     const flight=page.locator('#comparison-airstrike .metric-table tr').filter({has:page.getByRole('rowheader',{name:'Flight time (min-max, estimate)',exact:true})});
     assert.match(await flight.locator('td').innerText(),/\d+(\.\d+)?s-\d+(\.\d+)?s/);
+    const allocation=page.locator('#comparison-airstrike .metric-table').getByRole('row',{name:'Inner allocation 50%',exact:true});
+    assert(await allocation.isVisible());
+    assert.deepEqual(await page.evaluate(()=>{const r=selections.find(r=>r.kind==='airstrike');return [0,null].map(innerPercentage=>comparisonMetrics({...r,innerPercentage}).find(([label])=>label==='Inner allocation')[1]);}),['0%','N/A']);
     assert((await page.locator('#comparison-airstrike .source-data').textContent()).includes('Source omits useFixedTimeToAttackPoint'));
     await page.locator('#comparison-tab-bomb').click();
     assert(await page.evaluate(()=>!catalog.entries.some(e=>e.shipId==='TEST_FLOAT_ONLY'||e.aircraft==='TEST_FLOAT_FIGHTER')));
@@ -230,6 +233,12 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.locator('#share').click();const skipLink=await page.evaluate(()=>navigator.clipboard.readText());
     await page.goto(skipLink);await page.waitForFunction(()=>!busy);
     assert(await page.evaluate(()=>selections.some(r=>r.kind==='skip'&&!r.outer)));
+    if(await page.locator('html').getAttribute('data-theme')!=='dark')await page.locator('#theme-toggle').click();
+    await page.getByRole('link',{name:'Reset page',exact:true}).click();
+    await page.waitForFunction(()=>typeof busy!=='undefined'&&!busy&&selections.length===3);
+    assert.equal(new URL(page.url()).search,'');
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+    assert(await page.evaluate(()=>activeGame==='korabli'&&shipSlots.length===3&&shipSlots.every(slot=>!slot.customName&&!Object.keys(slot.modifiers||{}).length)));
     assert.deepEqual(errors,[]);console.log('PASS empty site, cross-game isolation, same scale, share, modifiers, import, attack outlines, skip data-only selection and responsive tests');
   }finally{
     if(browser)await browser.close();

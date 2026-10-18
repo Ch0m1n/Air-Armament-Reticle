@@ -102,7 +102,7 @@ function comparisonMetrics(item) {
     const sector=torpedoSector(item);
     return [...source,['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation width (estimate)',sector?Number(sector.startWidth.toFixed(1))+' m':'N/A'],['Full-aim width at reference distance',sector?`${Number(sector.aimWidth.toFixed(1))} m / ${Number((sector.aimDistance/1000).toFixed(2))} km`:'N/A'],['Formation rows',item.rows]];
   }
-  return [...source,['Drop area',dimension(item.outer)],['Inner region',dimension(item.inner)],...airstrikeTimingRows(item),['Bombs per attack',item.payload?.count??'N/A'],['Release interval',item.raw.attackInterval+' s']];
+  return [...source,['Drop area',dimension(item.outer)],['Inner region',dimension(item.inner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%'],...airstrikeTimingRows(item),['Bombs per attack',item.payload?.count??'N/A'],['Release interval',item.raw.attackInterval+' s']];
 }
 function sourceData(item) {
   if(item.files)return item.files.map(file=>{
