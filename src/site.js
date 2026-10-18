@@ -8,6 +8,7 @@ let activeGame='korabli',activeVersion='';
 let comparisonRole='bomb';
 const shipSlots=[];let nextSlot=1;
 const selectionSources=new Map();let modifierSlotId=null;
+let expandedDrawingId=null;
 const modifierHelpEntries=new Map();let activeHelpButton=null;
 const nationNames={USA:'U.S.A.',Germany:'Germany',Japan:'Japan',Netherlands:'Netherlands',UK:'U.K.',Russia:'U.S.S.R.'};
 const classNames={AirCarrier:'Aircraft carrier',Battleship:'Battleship',Cruiser:'Cruiser',Destroyer:'Destroyer',Submarine:'Submarine'};
@@ -144,14 +145,42 @@ function renderComparison(focus=null) {
     const drawing=item.kind==='bomb'?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item]),range);
     const targetRange=item.rangeDistance||range;
     const distance=item.kind==='torpedo'&&item.reference&&targetRange>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${targetRange}" step="1" value="${targetDistance(item,targetRange)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,targetRange))} m</output></label>`:'';
-    return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap">${drawing}${distance}</div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
+    return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap" data-expand="${item.id}">${drawing}${distance}<button class="drawing-expand icon-button" type="button" data-action="expand" data-id="${item.id}" title="Enlarge chart" aria-label="Enlarge chart">${glyph('Search')}</button></div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
     }).join('');
     const empty=!supportedRoles.has(kind)?`<div class="maintenance-state"><h3>Under the Maintenance!</h3><img src="./assets/{{maintenance}}" alt="Two cats wearing a construction helmet and working with a hammer" width="642" height="680"></div>`:`<div class="empty-state">${gameEntries().length?'No '+label.toLowerCase()+' selected':'No '+gameNames[activeGame]+' dataset loaded'}</div>`;
     return `<section id="comparison-${kind}" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-${kind}" data-comparison-role="${kind}"${kind===comparisonRole?'':' hidden'}><div class="${cardView?'comparison-cards':'comparison-list'}">${cards||empty}</div></section>`;
   }).join('');
   setBusy(busy);
+  refreshExpandedDrawing();
   if(focus)ui('results').querySelector(`[data-action="${focus.action}"][data-id="${focus.id}"]`)?.focus();
 }
+function refreshExpandedDrawing() {
+  if(expandedDrawingId==null)return;
+  const item=selections.find(item=>item.id===expandedDrawingId);
+  const card=ui('results').querySelector(`article[data-id="${expandedDrawingId}"]`);
+  if(!item||!card){ui('drawing-dialog').close();return;}
+  ui('drawing-title').textContent=(item.shipLabel||item.name)+' · '+roleNames[item.kind];
+  const article=document.createElement('article');article.className='expanded-reticle';article.dataset.id=item.id;
+  for(const node of card.querySelectorAll(':scope > .reference-tools,:scope > .drawing-wrap'))article.append(node.cloneNode(true));
+  article.querySelector('.drawing-expand')?.remove();article.querySelector('[data-expand]')?.removeAttribute('data-expand');
+  const viewBox=article.querySelector('.drawing-wrap > svg').viewBox.baseVal;
+  article.style.setProperty('--chart-aspect',viewBox.width/viewBox.height);
+  ui('drawing-detail').replaceChildren(article);
+}
+function openExpandedDrawing(id) {
+  if(busy)return;
+  expandedDrawingId=id;refreshExpandedDrawing();
+  if(ui('drawing-detail').children.length)ui('drawing-dialog').showModal();
+}
+ui('drawing-dialog').addEventListener('close',()=>{
+  const id=expandedDrawingId;expandedDrawingId=null;ui('drawing-detail').replaceChildren();
+  ui('results').querySelector(`[data-action="expand"][data-id="${id}"]`)?.focus();
+});
+ui('drawing-dialog').addEventListener('click',event=>{
+  if(event.target!==ui('drawing-dialog'))return;
+  const rect=ui('drawing-dialog').getBoundingClientRect();
+  if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)ui('drawing-dialog').close();
+});
 async function repositoryJson(file) {
   if(!/^GAME\/(WOWS|KORABLI)\/[A-Za-z0-9][A-Za-z0-9._-]*\/(Ships|Aircraft|Projectiles)\/[A-Za-z0-9_]+\.json$/.test(file)||!catalog.hashes[file])throw Error('Invalid repository data reference');
   if(!jsonCache.has(file))jsonCache.set(file,(async()=>{
@@ -319,10 +348,17 @@ ui('shared-scale').addEventListener('change',event=>{sharedScale=event.target.ch
 ui('cards-view').addEventListener('click',()=>{cardView=true;renderComparison();});
 ui('list-view').addEventListener('click',()=>{cardView=false;renderComparison();});
 ui('clear').addEventListener('click',()=>{if(busy)return;selections.length=0;shipSlots.length=0;shipSlots.push(newSlot());uploadedShips.clear();uploadedAircraft.clear();uploadedWeapons.clear();notice('');renderLibrary();renderComparison();});
-ui('results').addEventListener('click',event=>{
-  const button=event.target.closest('[data-action]');if(!button||button.disabled)return;
+function handleReticleClick(event){
+  const button=event.target.closest('[data-action]');
+  if(!button){
+    const drawing=event.target.closest('[data-expand]');
+    if(drawing&&!event.target.closest('input,label,button,output'))openExpandedDrawing(Number(drawing.dataset.expand));
+    return;
+  }
+  if(button.disabled)return;
   const id=Number(button.dataset.id),item=selections.find(r=>r.id===id);if(!item)return;
   const action=button.dataset.action;
+  if(action==='expand'){openExpandedDrawing(id);return;}
   if(action==='remove'){if(item.slotId)removeSlot(item.slotId);else selections.splice(selections.indexOf(item),1);renderLibrary();renderComparison();return;}
   if(action==='reference')item.reference=!item.reference;
   else if(action==='rotate')item.rotation=((item.rotation||0)+90)%180;
@@ -334,26 +370,31 @@ ui('results').addEventListener('click',event=>{
   else if(action==='aim-fully'||action==='aim-immediate'){item.aimMode=action==='aim-immediate'?'immediate':'fully';item.attack=null;}
   else if(action==='clear')item.attack=null;
   renderComparison({action,id});
-});
-ui('results').addEventListener('dblclick',event=>{
+  if(ui('drawing-dialog').open)ui('drawing-dialog').querySelector(`[data-action="${action}"]`)?.focus();
+}
+function handleReticleReset(event){
   const input=event.target.closest('[data-distance]');if(!input)return;
   const item=selections.find(r=>r.id===Number(input.dataset.distance));
   if(!item||!finite(item.armingDistance))return;
   input.value=String(Math.max(0,Math.min(Number(input.max),item.armingDistance)));
   input.dispatchEvent(new Event('input',{bubbles:true}));
-});
-ui('results').addEventListener('input',event=>{
+}
+function handleReticleDistance(event){
   const input=event.target.closest('[data-distance]');if(!input)return;
   const item=selections.find(r=>r.id===Number(input.dataset.distance));if(!item)return;
   const range=item.rangeDistance||commonDistance([item]);item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));
   const torpedoes=selections.filter(r=>r.kind==='torpedo');
   for(const member of torpedoes){
-    const svg=ui('results').querySelector(`article[data-id="${member.id}"] svg[data-metric-scale]`);
-    if(svg)svg.outerHTML=torpedoDrawing(member,commonScale(sharedScale?torpedoes:[member]),sharedScale?commonDistance(torpedoes):commonDistance([member]));
+    for(const svg of document.querySelectorAll(`article[data-id="${member.id}"] svg[data-metric-scale]`))svg.outerHTML=torpedoDrawing(member,commonScale(sharedScale?torpedoes:[member]),sharedScale?commonDistance(torpedoes):commonDistance([member]));
   }
-  const article=input.closest('article');
-  article.querySelector('output').textContent=Math.round(targetDistance(item,range))+' m';
-});
+  for(const article of document.querySelectorAll(`article[data-id="${item.id}"]`)){
+    const slider=article.querySelector('[data-distance]');if(slider)slider.value=String(item.targetDistance);
+    const output=article.querySelector('output');if(output)output.textContent=Math.round(targetDistance(item,range))+' m';
+  }
+}
+for(const root of [ui('results'),ui('drawing-dialog')]){
+  root.addEventListener('click',handleReticleClick);root.addEventListener('dblclick',handleReticleReset);root.addEventListener('input',handleReticleDistance);
+}
 ui('share').addEventListener('click',async()=>{
   try {
     if(selections.some(item=>!item.catalogId))throw Error('Uploaded JSON results must be shared using Export comparison.');
