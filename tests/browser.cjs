@@ -68,8 +68,8 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     assert.equal(viewBefore,await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance));
     await page.locator('#comparison-torpedo input[type="range"]').first().dblclick();
     assert(await page.evaluate(()=>{const item=selections.find(item=>item.kind==='torpedo');return Math.abs(item.targetDistance-item.armingDistance)<=0.5;}));
-    assert.equal(await torpedoSvg.getAttribute('viewBox'),'0 0 300 300');
-    const torpedoBox=await torpedoSvg.boundingBox();assert(Math.abs(torpedoBox.width-torpedoBox.height)<1);
+    assert.equal(await torpedoSvg.getAttribute('viewBox'),'0 0 300 345');
+    const torpedoBox=await torpedoSvg.boundingBox();assert(Math.abs(torpedoBox.height/torpedoBox.width-1.15)<0.01);
     await page.screenshot({path:path.join(artifacts,'torpedo-metric-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
