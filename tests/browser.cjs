@@ -50,6 +50,15 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     const origin=await serve(fixture);await page.goto(origin+'?game=korabli&version=fixture-A');await page.waitForFunction(()=>!busy&&selections.length===3);
     assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),5);
     const first=page.locator('.ship-editor').first(),second=page.locator('.ship-editor').nth(1);
+    const bomber=page.locator('#comparison-bomb article').first();
+    await bomber.getByRole('button',{name:'Simulate bomb drops',exact:true}).click();
+    assert.equal(await bomber.locator('.bomber-drop').count(),2);
+    await bomber.getByRole('button',{name:'Immediate drop',exact:true}).click();
+    assert.equal(await bomber.locator('.bomber-drop').count(),0);
+    await bomber.getByRole('button',{name:'Simulate bomb drops',exact:true}).click();
+    assert.equal(await bomber.locator('.bomber-drop').count(),2);
+    await bomber.getByRole('button',{name:'Clear',exact:true}).click();
+    assert.equal(await bomber.locator('.bomber-drop').count(),0);
     await page.locator('#comparison-tab-torpedo').click();
     const torpedoSvg=page.locator('#comparison-torpedo svg[data-metric-scale]').first();
     assert.equal(await torpedoSvg.getAttribute('data-metric-scale'),await torpedoSvg.getAttribute('data-reference-scale'));
@@ -57,6 +66,10 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.locator('#comparison-torpedo input[type="range"]').first().evaluate(input=>{input.value=input.max;input.dispatchEvent(new Event('input',{bubbles:true}));});
     assert.equal(Number(await torpedoSvg.getAttribute('data-view-distance')),viewBefore);
     assert.equal(viewBefore,await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance));
+    await page.locator('#comparison-torpedo input[type="range"]').first().dblclick();
+    assert(await page.evaluate(()=>{const item=selections.find(item=>item.kind==='torpedo');return Math.abs(item.targetDistance-item.armingDistance)<=0.5;}));
+    assert.equal(await torpedoSvg.getAttribute('viewBox'),'0 0 300 300');
+    const torpedoBox=await torpedoSvg.boundingBox();assert(Math.abs(torpedoBox.width-torpedoBox.height)<1);
     await page.screenshot({path:path.join(artifacts,'torpedo-metric-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

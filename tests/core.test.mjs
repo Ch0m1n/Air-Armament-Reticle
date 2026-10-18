@@ -137,6 +137,23 @@ test('torpedo sectors use metric widths, equal axes and no heuristic direction t
   assert(core.torpedoDrawing(changed,scaleOther).includes(`data-metric-scale="${scaleOther}"`));
 });
 
+test('bomber drop previews use selected aiming regions, payload and inner allocation',()=>{
+  const entry=catalog.entries.find(entry=>entry.role==='bomb'),plane=read(entry.files[1]);
+  const result=core.analyze(plane,plane.name+'.json');
+  let seed=17;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
+  const count=plane.attackerSize*plane.projectilesPerAttack*plane.attackCount;
+  const fully=core.simulateBomber(result,random);assert.equal(fully.length,count);
+  const inside=(p,d)=>(p.x/(d.width/2))**2+(p.y/(d.height/2))**2<=1+1e-9;
+  assert(fully.every(p=>inside(p,result.aimMinimum)));
+  result.aimMode='immediate';const immediate=core.simulateBomber(result,random);
+  assert.equal(immediate.length,count);assert(immediate.every(p=>inside(p,result.outer)));
+  result.innerPercentage=100;assert(core.simulateBomber(result,random).every(p=>inside(p,result.inner)));
+  result.innerPercentage=0;assert(core.simulateBomber(result,random).every(p=>!inside(p,result.inner)));
+  result.attack={points:immediate};assert(core.bombDrawing(result).includes('class="bomber-drop"'));
+  assert.equal(core.bomberPayload({...result,raw:{...plane,attackerSize:0}}),null);
+  assert.equal(core.simulateBomber({...result,raw:{...plane,attackerSize:0}},random).length,0);
+});
+
 test('web application shell is separate from the offline file viewer UI',()=>{
   const shell=fs.readFileSync(path.join(root,'src/shell.html'),'utf8');
   assert(shell.includes('class="workbench"'));assert(shell.includes('id="ship-editors"'));assert(shell.includes('id="add-ship"'));

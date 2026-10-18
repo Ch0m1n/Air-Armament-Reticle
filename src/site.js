@@ -111,7 +111,7 @@ function cardTools(item) {
   const id=item.id;
   return `<div class="reference-tools"><button type="button" data-action="reference" data-id="${id}" aria-pressed="${!!item.reference}" title="Yamato reference (263 × 38.9 m)"><img src="${YAMATO_IMAGE}" alt="">Yamato</button>
     ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:''}
-    ${item.kind==='airstrike'?`<button type="button" data-action="play" data-id="${id}" aria-label="Simulate airstrike" title="Simulate airstrike"${item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>`;
+    ${['bomb','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${item.kind==='bomb'?'Simulate bomb drops':'Simulate airstrike'}" title="${item.kind==='bomb'?'Illustrative bomb drops; not game RNG':'Simulate airstrike'}"${item.kind==='bomb'?bomberPayload(item)&&bomberSimulationRegion(item).outer?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${item.kind==='bomb'?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${label}</button>`).join('')}</div>`:''}`;
 }
 function renderComparisonTabs() {
   ui('comparison-tabs').innerHTML=Object.entries(roleNames).map(([kind,label])=>`<button type="button" id="comparison-tab-${kind}" role="tab" data-comparison-tab="${kind}" aria-controls="comparison-${kind}" aria-selected="${kind===comparisonRole}" tabindex="${kind===comparisonRole?0:-1}">${label}<small>${selections.filter(item=>item.kind===kind).length}</small></button>`).join('');
@@ -326,9 +326,21 @@ ui('results').addEventListener('click',event=>{
   if(action==='remove'){if(item.slotId)removeSlot(item.slotId);else selections.splice(selections.indexOf(item),1);renderLibrary();renderComparison();return;}
   if(action==='reference')item.reference=!item.reference;
   else if(action==='rotate')item.rotation=((item.rotation||0)+90)%180;
-  else if(action==='play')item.attack={points:simulateAirstrike(item),startedAt:Date.now()};
+  else if(action==='play'){
+    const points=item.kind==='bomb'?simulateBomber(item):simulateAirstrike(item);
+    if(!points.length){notice('Drop preview unavailable for these region or payload values.',true);return;}
+    item.attack={points,startedAt:Date.now()};notice('');
+  }
+  else if(action==='aim-fully'||action==='aim-immediate'){item.aimMode=action==='aim-immediate'?'immediate':'fully';item.attack=null;}
   else if(action==='clear')item.attack=null;
   renderComparison({action,id});
+});
+ui('results').addEventListener('dblclick',event=>{
+  const input=event.target.closest('[data-distance]');if(!input)return;
+  const item=selections.find(r=>r.id===Number(input.dataset.distance));
+  if(!item||!finite(item.armingDistance))return;
+  input.value=String(Math.max(0,Math.min(Number(input.max),item.armingDistance)));
+  input.dispatchEvent(new Event('input',{bubbles:true}));
 });
 ui('results').addEventListener('input',event=>{
   const input=event.target.closest('[data-distance]');if(!input)return;
