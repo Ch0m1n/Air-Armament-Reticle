@@ -108,13 +108,24 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     const viewBefore=Number(await torpedoSvg.getAttribute('data-view-distance'));
     await page.locator('#comparison-torpedo input[type="range"]').first().evaluate(input=>{input.value=input.max;input.dispatchEvent(new Event('input',{bubbles:true}));});
     assert.equal(Number(await torpedoSvg.getAttribute('data-view-distance')),viewBefore);
-    assert.equal(viewBefore,await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance));
+    assert.equal(viewBefore,Math.min(1500,await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance)));
+    assert.equal(Number(await page.locator('#comparison-torpedo input[type="range"]').first().getAttribute('max')),viewBefore);
+    const nearScale=Number(await torpedoSvg.getAttribute('data-metric-scale'));
+    await page.locator('#comparison-torpedo [data-action="range-full"]').first().click();
+    assert.equal(Number(await torpedoSvg.getAttribute('data-view-distance')),await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance));
+    assert(Number(await torpedoSvg.getAttribute('data-metric-scale'))<=nearScale);
+    await page.locator('#comparison-torpedo [data-action="range-near"]').first().click();
+    assert.equal(Number(await torpedoSvg.getAttribute('data-view-distance')),viewBefore);
     await page.locator('#comparison-torpedo input[type="range"]').first().dblclick();
     assert(await page.evaluate(()=>{const item=selections.find(item=>item.kind==='torpedo');return Math.abs(item.targetDistance-item.armingDistance)<=0.5;}));
     assert.equal(await torpedoSvg.getAttribute('viewBox'),'0 0 300 345');
     const torpedoBox=await torpedoSvg.boundingBox();assert(Math.abs(torpedoBox.height/torpedoBox.width-1.15)<0.01);
     await page.locator('#comparison-torpedo [data-action="expand"]').first().click();
     const expandedRange=drawingDialog.locator('input[type="range"]');
+    await drawingDialog.locator('[data-action="range-full"]').click();
+    assert.equal(await page.locator('#comparison-torpedo [data-action="range-full"]').first().getAttribute('aria-pressed'),'true');
+    assert.equal(await expandedRange.getAttribute('max'),String(await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance)));
+    await drawingDialog.locator('[data-action="range-near"]').click();
     await expandedRange.evaluate(input=>{input.value=input.max;input.dispatchEvent(new Event('input',{bubbles:true}));});
     assert.equal(await expandedRange.inputValue(),await page.locator('#comparison-torpedo input[type="range"]').first().inputValue());
     await expandedRange.dblclick();
@@ -122,6 +133,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.screenshot({path:path.join(artifacts,'expanded-torpedo-desktop.png')});
     await page.setViewportSize({width:390,height:844});
     assert(await drawingDialog.evaluate(el=>{const r=el.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.height<=innerHeight;}));
+    assert(await expandedRange.evaluate(el=>{const r=el.getBoundingClientRect(),box=el.closest('.drawing-wrap').getBoundingClientRect();return r.left>=box.left+4&&r.right<=box.right-4&&r.top>=box.top&&r.bottom<=box.bottom;}));
     await page.screenshot({path:path.join(artifacts,'expanded-torpedo-mobile.png')});
     await drawingDialog.getByRole('button',{name:'Close chart',exact:true}).click();
     assert(await page.locator('#comparison-torpedo [data-action="expand"]').first().evaluate(el=>el===document.activeElement));
@@ -130,6 +142,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.setViewportSize({width:390,height:844});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await torpedoSvg.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(artifacts,'torpedo-metric-mobile.png')});
+    assert(await page.locator('#comparison-torpedo input[type="range"]').first().evaluate(el=>{const r=el.getBoundingClientRect(),box=el.closest('.drawing-wrap').getBoundingClientRect();return r.left>=box.left+4&&r.right<=box.right-4&&r.top>=box.top&&r.bottom<=box.bottom;}));
     await page.setViewportSize({width:1440,height:1000});await page.locator('#comparison-tab-bomb').click();
     assert.deepEqual(await page.evaluate(()=>{
       const saved=catalog.entries,slot=shipSlots[0];

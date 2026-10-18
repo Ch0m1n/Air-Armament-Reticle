@@ -80,3 +80,5 @@ input,select{background:var(--input)}.app-header{background:var(--header)}.libra
 .ship-editor[data-drop-axis="x"][data-drop-side="after"]{box-shadow:4px 0 0 var(--green)}
 .ship-editor[data-drop-axis="y"][data-drop-side="before"]{box-shadow:0 -4px 0 var(--green)}
 .ship-editor[data-drop-axis="y"][data-drop-side="after"]{box-shadow:0 4px 0 var(--green)}
+.range-modes{display:inline-flex;gap:0}.range-modes button{border-radius:0}.range-modes button+button{margin-left:-1px}.range-modes button:first-child{border-radius:3px 0 0 3px}.range-modes button:last-child{border-radius:0 3px 3px 0}
+.drawing-wrap .distance-control{right:8px;width:24px}.drawing-wrap .distance-control input{box-sizing:border-box;min-width:0;width:24px;max-width:100%;border:0;box-shadow:none}

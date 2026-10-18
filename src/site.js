@@ -8,6 +8,8 @@ const supportedRoles=new Set(['bomb','torpedo','airstrike','attack']);
 let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
 let activeGame='korabli',activeVersion='';
 let comparisonRole='bomb';
+let torpedoFullRange=false;
+const torpedoDistanceLimit=()=>torpedoFullRange?Infinity:1500;
 const shipSlots=[];let nextSlot=1;
 let slotDrag=null;
 const selectionSources=new Map();let modifierSlotId=null;
@@ -116,7 +118,7 @@ function sourceData(item) {
 function cardTools(item) {
   const id=item.id;
   return `<div class="reference-tools"><button type="button" data-action="reference" data-id="${id}" aria-pressed="${!!item.reference}" title="Yamato reference (263 × 38.9 m)"><img src="${YAMATO_IMAGE}" alt="">Yamato</button>
-    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:''}
+    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:`<span class="range-modes" role="group" aria-label="Torpedo display range">${[['near','1.5 km'],['full','Full range']].map(([mode,label])=>`<button type="button" data-action="range-${mode}" data-id="${id}" aria-pressed="${torpedoFullRange===(mode==='full')}">${label}</button>`).join('')}</span>`}
     ${['bomb','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${item.kind==='bomb'?'Simulate bomb drops':'Simulate airstrike'}" title="${item.kind==='bomb'?'Illustrative bomb drops; not game RNG':'Simulate airstrike'}"${item.kind==='bomb'?bomberPayload(item)&&bomberSimulationRegion(item).outer?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${item.kind==='bomb'?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${label}</button>`).join('')}</div>`:''}`;
 }
 function renderComparisonTabs() {
@@ -154,11 +156,12 @@ function renderComparison(focus=null) {
   ui('results').innerHTML=kinds.map(kind=>{
     const label=roleNames[kind];
     const members=supportedRoles.has(kind)?selections.filter(item=>item.kind===kind):[];
-    const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members);
+    const distanceLimit=torpedoDistanceLimit();
+    const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members,distanceLimit);
     const cards=members.map(item=>{
     const range=sharedScale?torpedoExtent:commonDistance([item]);
-    const drawing=item.kind==='attack'?bombDrawing(item,null,commonRocketScale(sharedScale?members:[item])):item.kind==='bomb'?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item]),range);
-    const targetRange=item.rangeDistance||range;
+    const drawing=item.kind==='attack'?bombDrawing(item,null,commonRocketScale(sharedScale?members:[item])):item.kind==='bomb'?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item],distanceLimit),range,distanceLimit);
+    const targetRange=Math.min(item.rangeDistance||range,distanceLimit);
     const distance=item.kind==='torpedo'&&item.reference&&targetRange>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${targetRange}" step="1" value="${targetDistance(item,targetRange)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,targetRange))} m</output></label>`:'';
     return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap" data-expand="${item.id}">${drawing}${distance}<button class="drawing-expand icon-button" type="button" data-action="expand" data-id="${item.id}" title="Enlarge chart" aria-label="Enlarge chart">${glyph('Search')}</button></div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
     }).join('');
@@ -443,6 +446,7 @@ function handleReticleClick(event){
   if(action==='expand'){openExpandedDrawing(id);return;}
   if(action==='remove'){if(item.slotId)removeSlot(item.slotId);else selections.splice(selections.indexOf(item),1);renderLibrary();renderComparison();return;}
   if(action==='reference')item.reference=!item.reference;
+  else if(action==='range-near'||action==='range-full')torpedoFullRange=action==='range-full';
   else if(action==='rotate')item.rotation=((item.rotation||0)+90)%180;
   else if(action==='play'){
     const points=item.kind==='bomb'?simulateBomber(item):simulateAirstrike(item);
@@ -464,10 +468,10 @@ function handleReticleReset(event){
 function handleReticleDistance(event){
   const input=event.target.closest('[data-distance]');if(!input)return;
   const item=selections.find(r=>r.id===Number(input.dataset.distance));if(!item)return;
-  const range=item.rangeDistance||commonDistance([item]);item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));
+  const range=Math.min(item.rangeDistance||commonDistance([item]),torpedoDistanceLimit());item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));
   const torpedoes=selections.filter(r=>r.kind==='torpedo');
   for(const member of torpedoes){
-    for(const svg of document.querySelectorAll(`article[data-id="${member.id}"] svg[data-metric-scale]`))svg.outerHTML=torpedoDrawing(member,commonScale(sharedScale?torpedoes:[member]),sharedScale?commonDistance(torpedoes):commonDistance([member]));
+    for(const svg of document.querySelectorAll(`article[data-id="${member.id}"] svg[data-metric-scale]`))svg.outerHTML=torpedoDrawing(member,commonScale(sharedScale?torpedoes:[member],torpedoDistanceLimit()),sharedScale?commonDistance(torpedoes):commonDistance([member]),torpedoDistanceLimit());
   }
   for(const article of document.querySelectorAll(`article[data-id="${item.id}"]`)){
     const slider=article.querySelector('[data-distance]');if(slider)slider.value=String(item.targetDistance);

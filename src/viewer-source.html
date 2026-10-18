@@ -334,9 +334,9 @@ function analyze(input, filename, weapon=null) {
   throw Error('No supported bomb ellipse or torpedo attack-formation data found.');
 }
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function commonScale(items) {
+function commonScale(items,distanceLimit=Infinity) {
   const torps=items.filter(r=>r.kind==='torpedo');
-  const distance=Math.max(1,...torps.map(torpedoViewDistance));
+  const distance=Math.max(1,...torps.map(r=>Math.min(torpedoViewDistance(r),distanceLimit)));
   const width=Math.max(1,...torps.map(r=>{
     const sector=torpedoSector(r);
     return Math.max(r.reference?263*torpedoReferenceFactor(r):0,r.spanX*30,sector?Math.abs(sector.startWidth+2*sector.edgeSlope*distance):0);
@@ -407,13 +407,13 @@ function simulateBomber(r,random=Math.random) {
   }
   return points;
 }
-function torpedoDrawing(r,scale,distanceScale=commonDistance([r])) {
+function torpedoDrawing(r,scale,distanceScale=commonDistance([r]),distanceLimit=Infinity) {
   const minX=Math.min(...r.points.map(p=>p.x)),maxX=Math.max(...r.points.map(p=>p.x));
   const minZ=Math.min(...r.points.map(p=>p.z)),maxZ=Math.max(...r.points.map(p=>p.z));
   const coords=r.points.map(p=>({x:140+(p.x-(minX+maxX)/2)*30*scale,y:265-(p.z-minZ)*30*scale}));
   const sector=torpedoSector(r);
   const hasRange=positive(r.rangeDistance)&&positive(distanceScale);
-  const viewDistance=torpedoViewDistance(r);
+  const viewDistance=Math.min(torpedoViewDistance(r),distanceLimit);
   const manual=r.directionSource==='manual user illustration';
   const edgeSlope=manual?(r.direction==='parallel'?0:(r.direction==='converging'?-1:1)*Math.abs(sector?.edgeSlope||0)):sector?.edgeSlope||0;
   const endWidth=sector?sector.startWidth+2*edgeSlope*viewDistance:r.spanX*30;
@@ -431,7 +431,7 @@ function torpedoDrawing(r,scale,distanceScale=commonDistance([r])) {
   const top=265-viewDistance*scale;
   const axis=hasRange?`<path class="travel" d="M 265 ${top} V 265 M 261 ${top} H 269 M 261 265 H 269"/><text x="257" y="${top-6}" text-anchor="end">${Math.round(viewDistance)} m</text><text x="257" y="280" text-anchor="end">0 m</text>`:'';
   const referenceFactor=torpedoReferenceFactor(r),referenceScale=scale*referenceFactor;
-  const reference=r.reference?yamatoDrawing(140,265-targetDistance(r,hasRange?r.rangeDistance:viewDistance)*scale,referenceScale,90):'';
+  const reference=r.reference?yamatoDrawing(140,265-targetDistance(r,viewDistance)*scale,referenceScale,90):'';
   return `<svg class="torpedo-diagram" viewBox="0 0 300 345" role="img" aria-label="Estimated fully aimed torpedo sector with explicit ship display scale" data-distance-scale="${hasRange?distanceScale:0}" data-metric-scale="${scale}" data-reference-scale="${referenceScale}" data-reference-factor="${referenceFactor}" data-view-distance="${viewDistance}"><text x="140" y="16" text-anchor="middle">Fully aimed sector estimate</text>${area}${lines}${dots}${reference}${axis}<text x="140" y="315" text-anchor="middle">${sector?`Formation width: ${Number(sector.startWidth.toFixed(1))} m`:'Sector unavailable'}</text><text x="140" y="336" text-anchor="middle">${r.reference?(referenceFactor===2?'Yamato: approx. in-game scale ×2':'Yamato: physical length ×1'):'Individual drops schematic'}</text></svg>`;
 }
 // UI

@@ -249,6 +249,10 @@ test('torpedo sectors use metric widths, equal axes and no heuristic direction t
   const scale=core.commonScale([result]),svg=core.torpedoDrawing(result,scale);
   assert.equal(core.torpedoViewDistance(result),3990);
   assert(svg.includes('data-view-distance="3990"'));
+  const nearScale=core.commonScale([result],1500),nearSvg=core.torpedoDrawing(result,nearScale,result.rangeDistance,1500);
+  assert(nearScale>scale);assert(nearSvg.includes('data-view-distance="1500"'));
+  assert.equal(result.rangeDistance,3990);
+  assert(core.torpedoDrawing({...result,rangeDistance:900},nearScale,900,1500).includes('data-view-distance="900"'));
   const moved={...result,targetDistance:3500};
   assert.equal(core.commonScale([moved]),scale);
   assert(core.torpedoDrawing(moved,scale).includes('data-view-distance="3990"'));
