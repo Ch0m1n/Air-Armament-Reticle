@@ -50,6 +50,18 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     const origin=await serve(fixture);await page.goto(origin+'?game=korabli&version=fixture-A');await page.waitForFunction(()=>!busy&&selections.length===3);
     assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),5);
     const first=page.locator('.ship-editor').first(),second=page.locator('.ship-editor').nth(1);
+    await page.locator('#comparison-tab-torpedo').click();
+    const torpedoSvg=page.locator('#comparison-torpedo svg[data-metric-scale]').first();
+    assert.equal(await torpedoSvg.getAttribute('data-metric-scale'),await torpedoSvg.getAttribute('data-reference-scale'));
+    const viewBefore=Number(await torpedoSvg.getAttribute('data-view-distance'));
+    await page.locator('#comparison-torpedo input[type="range"]').first().evaluate(input=>{input.value=input.max;input.dispatchEvent(new Event('input',{bubbles:true}));});
+    assert.equal(Number(await torpedoSvg.getAttribute('data-view-distance')),viewBefore);
+    assert.equal(viewBefore,await page.evaluate(()=>selections.find(item=>item.kind==='torpedo').rangeDistance));
+    await page.screenshot({path:path.join(artifacts,'torpedo-metric-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await torpedoSvg.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(artifacts,'torpedo-metric-mobile.png')});
+    await page.setViewportSize({width:1440,height:1000});await page.locator('#comparison-tab-bomb').click();
     assert.deepEqual(await page.evaluate(()=>{
       const saved=catalog.entries,slot=shipSlots[0];
       try{

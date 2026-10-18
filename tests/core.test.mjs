@@ -107,6 +107,36 @@ test('modifiers use a numeric allowlist and never mutate repository inputs',()=>
   assert.match(core.modifierHelp('torpedo',{key:'maxSpread'}),/does not draw/);
   assert.match(core.modifierHelp('airstrike',{key:'flightHeight'}),/Does not change the drawn drop area/);
 });
+test('torpedo sectors use metric widths, equal axes and no heuristic direction threshold',()=>{
+  const raw={name:'TEST_SECTOR',typeinfo:{type:'Aircraft'},torpedoName:'TEST_WEAPON',attackerSize:3,projectilesPerAttack:2,attackCount:1,minSpread:7,maxSpread:100,torpedoAimDist:100,formations:{attack:[0.1,[[0,0,-2.5],[-3.5,0,0],[3.5,0,0]]]}};
+  const result=core.analyze(raw,'test.json');
+  assert.equal(result.direction,'parallel');
+  assert.equal(core.torpedoSector(result).startWidth,210);
+  assert.equal(core.torpedoSector(result).aimWidth,210);
+  assert.equal(core.torpedoSector(result).edgeSlope,0);
+  core.attachTorpedoWeapon(result,{ammoType:'torpedo',maxDist:133,speed:35,armingTime:5.5});
+  result.reference=true;
+  const scale=core.commonScale([result]),svg=core.torpedoDrawing(result,scale);
+  assert.equal(core.torpedoViewDistance(result),3990);
+  assert(svg.includes('data-view-distance="3990"'));
+  const moved={...result,targetDistance:3500};
+  assert.equal(core.commonScale([moved]),scale);
+  assert(core.torpedoDrawing(moved,scale).includes('data-view-distance="3990"'));
+  assert(svg.includes(`data-reference-scale="${scale}"`));assert(svg.includes(`data-metric-scale="${scale}"`));
+  assert(!svg.includes('NaN'));assert(!svg.includes('Infinity'));
+  const wows={...result,game:'wows'};
+  assert.equal(core.torpedoReferenceFactor(wows),2);
+  assert.equal(core.torpedoReferenceFactor({...result,game:'korabli'}),1);
+  assert(core.torpedoDrawing(wows,scale).includes(`data-reference-scale="${scale*2}"`));
+  assert.equal(core.torpedoSector(wows).aimWidth,core.torpedoSector(result).aimWidth);
+  const changed=core.analyze({...raw,minSpread:25},'test.json'),sector=core.torpedoSector(changed);
+  assert.equal(changed.direction,'diverging');assert.equal(sector.aimWidth,750);assert.equal(sector.aimDistance,3000);assert.equal(sector.edgeSlope,0.09);
+  const converging=core.analyze({...raw,minSpread:2},'test.json');assert.equal(converging.direction,'converging');
+  const scaleOther=core.commonScale([result,changed]);
+  assert(core.torpedoDrawing(result,scaleOther).includes(`data-metric-scale="${scaleOther}"`));
+  assert(core.torpedoDrawing(changed,scaleOther).includes(`data-metric-scale="${scaleOther}"`));
+});
+
 test('web application shell is separate from the offline file viewer UI',()=>{
   const shell=fs.readFileSync(path.join(root,'src/shell.html'),'utf8');
   assert(shell.includes('class="workbench"'));assert(shell.includes('id="ship-editors"'));assert(shell.includes('id="add-ship"'));

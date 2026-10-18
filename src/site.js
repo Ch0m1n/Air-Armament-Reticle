@@ -94,7 +94,10 @@ const dimension=value=>value?`${Number(value.width.toFixed(1))} × ${Number(valu
 function comparisonMetrics(item) {
   const source=activeGame==='mixed'&&item.version?[['Version',item.version]]:[];
   if(item.kind==='bomb')return [...source,['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
-  if(item.kind==='torpedo')return [...source,['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation rows',item.rows]];
+  if(item.kind==='torpedo'){
+    const sector=torpedoSector(item);
+    return [...source,['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation width (estimate)',sector?Number(sector.startWidth.toFixed(1))+' m':'N/A'],['Full-aim width at reference distance',sector?`${Number(sector.aimWidth.toFixed(1))} m / ${Number((sector.aimDistance/1000).toFixed(2))} km`:'N/A'],['Formation rows',item.rows]];
+  }
   return [...source,['Drop area',dimension(item.outer)],['Inner region',dimension(item.inner)],...airstrikeTimingRows(item),['Bombs per attack',item.payload?.count??'N/A'],['Release interval',item.raw.attackInterval+' s']];
 }
 function sourceData(item) {
@@ -139,7 +142,8 @@ function renderComparison(focus=null) {
     const cards=members.map(item=>{
     const range=sharedScale?torpedoExtent:commonDistance([item]);
     const drawing=item.kind==='bomb'?bombDrawing(item,metricExtent):item.kind==='airstrike'?airstrikeDrawing(item,metricExtent||Math.max(item.outer.width,item.outer.height,item.reference?263:1)):torpedoDrawing(item,sharedScale?formationScale:commonScale([item]),range);
-    const distance=item.kind==='torpedo'&&item.reference&&range>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${range}" step="1" value="${targetDistance(item,range)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,range))} m</output></label>`:'';
+    const targetRange=item.rangeDistance||range;
+    const distance=item.kind==='torpedo'&&item.reference&&targetRange>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${targetRange}" step="1" value="${targetDistance(item,targetRange)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,targetRange))} m</output></label>`:'';
     return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap">${drawing}${distance}</div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
     }).join('');
     const empty=!supportedRoles.has(kind)?`<div class="maintenance-state"><h3>Under the Maintenance!</h3><img src="./assets/{{maintenance}}" alt="Two cats wearing a construction helmet and working with a hammer" width="642" height="680"></div>`:`<div class="empty-state">${gameEntries().length?'No '+label.toLowerCase()+' selected':'No '+gameNames[activeGame]+' dataset loaded'}</div>`;
@@ -262,7 +266,7 @@ function openModifiers(slot) {
     const inputId='modifier-'+key.replaceAll(':','-');
     modifierHelpEntries.set(key,{label:field.label,text:modifierHelp(item.kind,field)});
     return `<div class="modifier-field"><span class="modifier-name"><label for="${inputId}">${escapeHtml(field.label)}</label><button type="button" class="modifier-help" data-modifier-help="${key}" aria-label="Help: ${escapeHtml(field.label)}">${glyph('CircleHelp')}</button></span><span class="modifier-original" aria-label="Original value">${field.value}</span><input id="${inputId}" type="number" required data-modifier="${key}" aria-label="${escapeHtml(field.label)}" title="${escapeHtml(hint)}" min="${field.min}" max="${field.max}" step="${field.integer?1:'any'}" value="${value}"><span class="modifier-unit">${escapeHtml(field.unit)}</span></div>`;
-  }).join('')+(item.kind==='torpedo'?'<p>Torpedo spread affects the estimated direction only; horizontal spacing remains schematic.</p>':'');
+  }).join('')+(item.kind==='torpedo'?'<p>Full-aim sector estimate; individual torpedo spacing and build effects are not reproduced.</p>':'');
   if(!ui('modifiers-dialog').open)ui('modifiers-dialog').showModal();
 }
 const modifierTooltip=document.createElement('div');modifierTooltip.id='modifier-tooltip';modifierTooltip.setAttribute('role','tooltip');modifierTooltip.hidden=true;
@@ -329,8 +333,13 @@ ui('results').addEventListener('click',event=>{
 ui('results').addEventListener('input',event=>{
   const input=event.target.closest('[data-distance]');if(!input)return;
   const item=selections.find(r=>r.id===Number(input.dataset.distance));if(!item)return;
-  const range=sharedScale?commonDistance(selections):commonDistance([item]);item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));
-  const article=input.closest('article');article.querySelector('.yamato-target')?.setAttribute('transform',`translate(140 ${175-targetDistance(item,range)*140/range}) rotate(90)`);
+  const range=item.rangeDistance||commonDistance([item]);item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));
+  const torpedoes=selections.filter(r=>r.kind==='torpedo');
+  for(const member of torpedoes){
+    const svg=ui('results').querySelector(`article[data-id="${member.id}"] svg[data-metric-scale]`);
+    if(svg)svg.outerHTML=torpedoDrawing(member,commonScale(sharedScale?torpedoes:[member]),sharedScale?commonDistance(torpedoes):commonDistance([member]));
+  }
+  const article=input.closest('article');
   article.querySelector('output').textContent=Math.round(targetDistance(item,range))+' m';
 });
 ui('share').addEventListener('click',async()=>{
@@ -375,7 +384,7 @@ async function importFiles(list) {
         if(!old&&selections.length>=12)continue;
         const item=analyze(file.raw,file.filename);attachData(item,uploadedWeapons.get(item.projectile),[...uploadedShips.values()]);
         if(item.kind==='airstrike'&&item.excluded){if(old)selections.splice(selections.indexOf(old),1);continue;}
-        Object.assign(item,{id:old?.id||nextSelection++,reference:old?.reference??true,rotation:old?.rotation||0,shipLabel:[...uploadedShips.values()].find(ship=>manifestAircraft(ship,new Map()).some(ref=>ref.id===name))?.name||'Uploaded aircraft'});
+        Object.assign(item,{id:old?.id||nextSelection++,game:activeGame,reference:old?.reference??true,rotation:old?.rotation||0,shipLabel:[...uploadedShips.values()].find(ship=>manifestAircraft(ship,new Map()).some(ref=>ref.id===name))?.name||'Uploaded aircraft'});
         if(old)selections[selections.indexOf(old)]=item;else selections.push(item);
       }catch(error){messages.push(name+': '+error.message);}
     }

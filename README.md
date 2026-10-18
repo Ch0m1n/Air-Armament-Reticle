@@ -1,8 +1,7 @@
 # WoWS-Korabli Air Armament Reticle
 
 A static comparison tool for aircraft weapon aiming areas, built for GitHub Pages.
-
-## https://ch0m1n.github.io/Air-Armament-Reticle/
+Site: https://ch0m1n.github.io/Air-Armament-Reticle/
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
 ## Local Development
@@ -84,7 +83,9 @@ The **Publish reticle viewer** workflow tests and builds on pushes to `main`, th
 
 ## Boundaries and Rights
 
-Calculations are estimates, not verified game RNG or ship hit probability. Terrain, build effects and full dynamic aiming are not reproduced. Inner allocation is not hit chance. Torpedo horizontal geometry remains schematic. Airstrike timing estimates activation to first impact; animations illustrate releases rather than real-time impact.
+For WoWS torpedo cards only, Yamato is rendered at an explicitly labeled approximate in-game magnification of 2 relative to map distances (physical length 263 m, displayed extent about 526 map meters), following the [official wiki map-scale explanation](https://wiki.worldofwarships.com/Ship:Maps). This changes only the reference image, not sector widths, distance axes, or arming/target center distances. Korabli and unknown-game references remain at physical scale pending verification. This correction is not applied to bomber/airstrike cards.
+
+Calculations are estimates, not verified game RNG or ship hit probability. Terrain, build effects and full dynamic aiming are not reproduced. Inner allocation is not hit chance. Torpedo sectors use the [published reverse-engineered width model](https://www.reddit.com/r/WorldOfWarships/comments/1975jry/): formation X span and minSpread at torpedoAimDist, converted at 30 m per raw unit. Each sector extends to its own projectile maximum range; moving the target does not change the viewing scale. Same scale uses the longest compared range to fit the diagrams, while each card labels its own endpoint. Both axes use one metric scale; WoWS reference magnification is described above. No arbitrary 4-degree parallel threshold or fixed fan-width multiplier is applied. This is a full-group, fully aimed estimate, not current-client validation: client boundary padding, build modifiers, partial groups, per-aircraft payload spacing and trajectories are not reproduced. Historical disassembly also references a boundary-padding constant whose current value is not established here. Airstrike timing estimates activation to first impact; animations illustrate releases rather than real-time impact.
 
 The calculation/drawing core is extracted from the existing offline viewer in `src/viewer-source.html`; its old UI is not used. The independent site lives in `src/shell.html`, `src/site.css` and `src/site.js`. The Yamato reference bitmap is retained as a visual asset (263 x 38.9 m), not a Ship JSON dataset.
 
