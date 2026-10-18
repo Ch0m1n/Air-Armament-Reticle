@@ -27,6 +27,16 @@ function glyph(name) {
   return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${nodes.map(([tag,attrs])=>`<${tag} ${Object.entries(attrs).map(([key,value])=>`${key}="${escapeHtml(value)}"`).join(' ')}/>`).join('')}</svg>`;
 }
 for(const node of document.querySelectorAll('[data-icon]'))node.innerHTML=glyph(node.dataset.icon);
+function renderTheme(){
+  const dark=document.documentElement.dataset.theme==='dark',button=ui('theme-toggle');
+  button.innerHTML=glyph(dark?'Sun':'Moon');button.setAttribute('aria-pressed',String(dark));
+  button.title=dark?'Switch to light mode':'Switch to dark mode';button.setAttribute('aria-label',button.title);
+}
+renderTheme();
+ui('theme-toggle').addEventListener('click',()=>{
+  const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;
+  try{localStorage.setItem('reticle-theme',theme);}catch{}renderTheme();
+});
 function notice(message,error=false){ui('status').textContent=message;ui('status').classList.toggle('error',error);}
 function setBusy(value) {
   busy=value;ui('results').setAttribute('aria-busy',String(value));
@@ -113,7 +123,7 @@ function renderComparison(focus=null) {
   ui('results').className='comparison-groups';
   renderComparisonTabs();
   ui('comparison-count').textContent=selections.length;
-  ui('comparison-subtitle').textContent=!supportedRoles.has(comparisonRole)?'Reticle data not yet supported':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
+  ui('comparison-subtitle').textContent=!supportedRoles.has(comparisonRole)?'Under the Maintenance!':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
   ui('cards-view').setAttribute('aria-pressed',String(cardView));ui('list-view').setAttribute('aria-pressed',String(!cardView));
   ui('results').innerHTML=Object.entries(roleNames).map(([kind,label])=>{
     const members=supportedRoles.has(kind)?selections.filter(item=>item.kind===kind):[];
@@ -124,7 +134,7 @@ function renderComparison(focus=null) {
     const distance=item.kind==='torpedo'&&item.reference&&range>0?`<label class="distance-control"><span class="sr-only">Yamato target distance</span><input type="range" data-distance="${item.id}" min="0" max="${range}" step="1" value="${targetDistance(item,range)}" aria-label="Yamato target distance"><output>${Math.round(targetDistance(item,range))} m</output></label>`:'';
     return `<article class="reticle-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">${roleNames[item.kind]}</span><h3>${escapeHtml(item.shipLabel||'Uploaded aircraft')}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button class="icon-button" type="button" data-action="remove" data-id="${item.id}" title="Remove ${escapeHtml(item.shipLabel||item.name)}" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div>${cardTools(item)}<div class="drawing-wrap">${drawing}${distance}</div><div class="card-data"><table class="metric-table"><tbody>${comparisonMetrics(item).map(([label,value])=>`<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody></table></div><details class="source-data"><summary>Source data</summary>${sourceData(item)}${item.warnings.map(w=>`<p>${escapeHtml(w)}</p>`).join('')}</details></article>`;
     }).join('');
-    const empty=`<div class="empty-state">${!supportedRoles.has(kind)?label+' reticle data is not supported yet':gameEntries().length?'No '+label.toLowerCase()+' selected':'No '+gameNames[activeGame]+' dataset loaded'}</div>`;
+    const empty=!supportedRoles.has(kind)?`<div class="maintenance-state"><h3>Under the Maintenance!</h3><img src="./assets/{{maintenance}}" alt="Two cats wearing a construction helmet and working with a hammer" width="642" height="680"></div>`:`<div class="empty-state">${gameEntries().length?'No '+label.toLowerCase()+' selected':'No '+gameNames[activeGame]+' dataset loaded'}</div>`;
     return `<section id="comparison-${kind}" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-${kind}" data-comparison-role="${kind}"${kind===comparisonRole?'':' hidden'}><div class="${cardView?'comparison-cards':'comparison-list'}">${cards||empty}</div></section>`;
   }).join('');
   setBusy(busy);

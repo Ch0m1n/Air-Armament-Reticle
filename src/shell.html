@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Compare World of Warships and Korabli bomber reticles, airstrike areas and torpedo drop patterns.">
 <title>WoWS-Korabli Air Armament Reticle</title>
+<script>try{if(localStorage.getItem('reticle-theme')==='dark')document.documentElement.dataset.theme='dark';}catch{}</script>
 <link rel="stylesheet" href="./assets/{{site.css}}">
 </head>
 <body>
@@ -12,6 +13,7 @@
   <div class="brand"><span class="brand-mark" data-icon="Crosshair"></span><h1>WoWS-Korabli <span>Air Armament Reticle</span></h1></div>
   <div class="game-switch" role="group" aria-label="Game"><button type="button" data-game="wows" aria-pressed="false">World of Warships</button><button type="button" data-game="korabli" aria-pressed="true">Korabli</button></div>
   <div class="header-actions">
+    <button id="theme-toggle" class="icon-button" type="button" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false" data-icon="Moon"></button>
     <button id="open" class="icon-button" type="button" title="Import JSON files" aria-label="Import JSON files" data-icon="Upload"></button>
     <button id="export" class="icon-button" type="button" title="Export comparison" aria-label="Export comparison" data-icon="Download" disabled></button>
     <button id="share" class="command" type="button" disabled><span data-icon="Copy"></span>Share</button>

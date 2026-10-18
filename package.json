@@ -3,6 +3,6 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"index": "node tools/reindex.mjs", "prebuild": "npm run index", "build": "node tools/build.mjs", "pretest": "npm run index", "test": "node --test tests/core.test.mjs", "preview": "node tools/preview.mjs"},
+  "scripts": {"index": "node tools/reindex.mjs", "prebuild": "npm run index", "build": "node tools/build.mjs", "pretest": "npm run index", "test": "node --test tests/core.test.mjs tests/publisher.test.mjs", "preview": "node tools/preview.mjs"},
   "engines": {"node": ">=22"}
 }

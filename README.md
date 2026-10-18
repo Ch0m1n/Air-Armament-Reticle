@@ -1,6 +1,7 @@
 # WoWS-Korabli Air Armament Reticle
 
 A static comparison tool for aircraft weapon aiming areas, built for GitHub Pages.
+Site: https://ch0m1n.github.io/Air-Armament-Reticle/
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
 ## Local Development
@@ -44,11 +45,24 @@ The importer accepts singular `Ship`/`Projectile` source folders as well as plur
 ## Interface
 
 - Select World of Warships or Korabli in the header.
+- Light mode is the default; the header theme control switches to dark mode and remembers the preference locally.
 - **Add Ship** creates independent editors (up to 12), each with version, nation, type, ship, armament, research module and aircraft selectors.
 - Editable ship labels, clone/remove controls and per-editor Modifiers support variant comparisons. Original values and help tooltips are provided; reset restores original inputs.
 - Results have separate bomber, torpedo bomber and airstrike tabs. Attack aircraft and skip-bomber tabs are reserved; their geometry is not implemented.
+- Reserved tabs display the provided animated maintenance WebP in place of results; the original animation is preserved.
 - Card/list comparison layouts, same scale within each armament type, Yamato reference, illustrative airstrike drops, share links, JSON import and result export are included.
 - Overrides do not mutate repository data. Edits persist in clones and shared links. Uploaded results can be exported, not shared as repository links.
+
+## Windows Data Publisher
+
+Double-click **Data-Publisher.cmd**. Requires PowerShell 7, Node.js 22+, Git and an authenticated GitHub CLI (`gh auth login --hostname github.com`). The repository destination is fixed to `Ch0m1n/Air-Armament-Reticle`.
+
+1. Browse to the WoWS and Korabli extracted JSON roots once. Settings stay in `%LOCALAPPDATA%/WoWS-Korabli-Air-Armament-Reticle/publisher-settings.json`, outside the repository.
+2. Select the game and enter a version name. A source root can contain the three data folders directly, or contain version subfolders; `15.10` can resolve a `1510` subfolder.
+3. **Preview files** validates references and shows the resolved source, destination, file counts, size and skipped references. Nothing is uploaded.
+4. **Upload to GitHub** asks for public-upload confirmation. An existing target version is refused unless **Replace existing version** is enabled.
+
+Only supported linked ships/aircraft/projectiles are selected. ASW/DC and currently unsupported geometry are excluded. No unrelated directories, path settings or credentials are copied. The uploader works in a disposable clone, runs index/tests/build, stages only `GAME/<game>/<version>/`, and performs a normal non-force push. Other versions and your working checkout are not modified. Preview hashes block unnoticed source changes. Failed pushes preserve the committed recovery checkout; successful updates trigger the existing Pages workflow. This program does not wait for the Pages deploy to finish.
 
 ## Tests
 

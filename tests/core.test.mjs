@@ -104,6 +104,13 @@ test('web application shell is separate from the offline file viewer UI',()=>{
   assert(!shell.includes('{{viewer.css}}'));
   assert(fs.readFileSync(path.join(root,'tools/build.mjs'),'utf8').includes("split('// UI')[0]"));
 });
+test('default light theme and original animated maintenance asset are included',()=>{
+  const shell=fs.readFileSync(path.join(root,'src/shell.html'),'utf8');
+  assert(shell.includes('data-theme="light"'));assert(shell.includes('id="theme-toggle"'));
+  const animation=fs.readFileSync(path.join(root,'src/assets/maintenance.webp'));
+  assert.equal(animation.toString('ascii',0,4),'RIFF');assert(animation.includes(Buffer.from('ANIM')));
+  assert(animation.toString('latin1').split('ANMF').length>2);
+});
 
 test('ship filters and module stages come from ship metadata and research links',()=>{
   const midway=catalog.entries.filter(entry=>entry.shipId==='TST001_Synthetic_Carrier'&&entry.role==='torpedo');

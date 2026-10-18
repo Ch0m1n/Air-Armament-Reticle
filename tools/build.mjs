@@ -17,8 +17,11 @@ fs.mkdirSync(path.join(out,'assets'),{recursive:true});
 fs.writeFileSync(path.join(out,'assets/yamato.png'),Buffer.from(image[1],'base64'));
 fs.copyFileSync(path.join(root,'src/vendor/lucide-LICENSE'),path.join(out,'assets/lucide-LICENSE.txt'));
 const assets={};
+const maintenance=fs.readFileSync(path.join(root,'src/assets/maintenance.webp'));
+assets.maintenance='maintenance-'+crypto.createHash('sha256').update(maintenance).digest('hex').slice(0,12)+'.webp';
+fs.writeFileSync(path.join(out,'assets',assets.maintenance),maintenance);
 for(const [name,text]of Object.entries({'viewer.js':engine,'icons.js':'globalThis.RETICLE_ICONS='+fs.readFileSync(path.join(root,'src/vendor/icons.json'),'utf8')+';','site.css':fs.readFileSync(path.join(root,'src/site.css'),'utf8'),'site.js':fs.readFileSync(path.join(root,'src/site.js'),'utf8')})) {
-  const bundled=name==='site.js'?fs.readFileSync(path.join(root,'src/modifiers.js'),'utf8')+'\n'+text:text;
+  const bundled=name==='site.js'?fs.readFileSync(path.join(root,'src/modifiers.js'),'utf8')+'\n'+text.replaceAll('{{maintenance}}',assets.maintenance):text;
   const hash=crypto.createHash('sha256').update(bundled).digest('hex').slice(0,12);
   const filename=name.replace('.',`-${hash}.`);assets[name]=filename;fs.writeFileSync(path.join(out,'assets',filename),bundled);
 }

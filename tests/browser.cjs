@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
   const fixture=fs.mkdtempSync(path.join(artifacts,'synthetic-browser-')),servers=[];let browser;
   async function serve(cwd){
     const socket=net.createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
-    const base='/WoWS-Korabli-Air-Armament-Reticle/',url=`http://127.0.0.1:${port}${base}`;servers.push(spawn(process.execPath,['tools/preview.mjs',String(port),base],{cwd,stdio:'ignore'}));
+    const base='/Air-Armament-Reticle/',url=`http://127.0.0.1:${port}${base}`;servers.push(spawn(process.execPath,['tools/preview.mjs',String(port),base],{cwd,stdio:'ignore'}));
     for(let i=0;i<40;i++){try{if((await fetch(url)).ok)return url;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw Error('Preview did not start');
   }
   try{
@@ -15,6 +15,27 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     const context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.goto(await serve(root));await page.waitForFunction(()=>typeof busy!=='undefined'&&!busy);
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+    await page.locator('#theme-toggle').click();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+    await page.reload();await page.waitForFunction(()=>!busy);assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+    await page.screenshot({path:path.join(artifacts,'empty-dark.png'),fullPage:true});
+    await page.locator('#theme-toggle').click();
+    for(const kind of ['attack','skip']){
+      await page.locator('#comparison-tab-'+kind).click();
+      const panel=page.locator('#comparison-'+kind);assert((await panel.innerText()).includes('Under the Maintenance!'));
+      assert(await panel.locator('img').evaluate(image=>image.complete&&image.naturalWidth>0));
+      assert((await panel.locator('img').getAttribute('src')).includes('maintenance-'));
+    }
+    await page.screenshot({path:path.join(artifacts,'maintenance-light.png'),fullPage:true});
+    const animation=page.locator('#comparison-skip .maintenance-state img');
+    const frame=await animation.screenshot();await new Promise(resolve=>setTimeout(resolve,350));assert(!frame.equals(await animation.screenshot()));
+    await page.setViewportSize({width:390,height:844});await animation.scrollIntoViewIfNeeded();
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.screenshot({path:path.join(artifacts,'maintenance-mobile.png')});
+    await page.locator('#theme-toggle').click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+    await animation.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(artifacts,'maintenance-dark-mobile.png')});
+    await page.locator('#theme-toggle').click();await page.setViewportSize({width:1440,height:1000});
     assert.equal(await page.locator('#results article').count(),0);assert.equal(await page.locator('.ship-editor').count(),1);
     assert((await page.locator('#dataset').innerText()).includes('No bundled dataset'));await page.locator('#add-ship').click();assert.equal(await page.locator('.ship-editor').count(),2);
     await page.locator('[data-game="wows"]').click();await page.waitForFunction(()=>!busy&&activeGame==='wows');assert(await page.locator('.ship-editor [data-field="ship"]').isDisabled());
