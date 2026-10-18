@@ -73,3 +73,10 @@ input,select{background:var(--input)}.app-header{background:var(--header)}.libra
 .maintenance-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 12px;text-align:center}
 .maintenance-state h3{font-size:18px;font-weight:600}.maintenance-state img{display:block;width:min(220px,100%);height:auto;object-fit:contain}
 .brand{color:inherit;text-decoration:none}
+.editor-heading .reorder-handle{margin-right:auto;cursor:grab;touch-action:none}
+.ship-reordering,.ship-reordering .reorder-handle{cursor:grabbing;user-select:none}
+.ship-editor.is-dragging{opacity:.55}
+.ship-editor[data-drop-axis="x"][data-drop-side="before"]{box-shadow:-4px 0 0 var(--green)}
+.ship-editor[data-drop-axis="x"][data-drop-side="after"]{box-shadow:4px 0 0 var(--green)}
+.ship-editor[data-drop-axis="y"][data-drop-side="before"]{box-shadow:0 -4px 0 var(--green)}
+.ship-editor[data-drop-axis="y"][data-drop-side="after"]{box-shadow:0 4px 0 var(--green)}

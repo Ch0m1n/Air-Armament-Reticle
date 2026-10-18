@@ -9,6 +9,7 @@ let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
 let activeGame='korabli',activeVersion='';
 let comparisonRole='bomb';
 const shipSlots=[];let nextSlot=1;
+let slotDrag=null;
 const selectionSources=new Map();let modifierSlotId=null;
 let expandedDrawingId=null;
 const modifierHelpEntries=new Map();let activeHelpButton=null;
@@ -53,11 +54,12 @@ function setBusy(value) {
 }
 function renderLibrary() {
   if(!catalog)return;
+  cancelSlotDrag();
   ui('library-count').textContent=shipSlots.length+' / 12';
-  ui('ship-editors').innerHTML=shipSlots.map(slot=>{
+  ui('ship-editors').innerHTML=shipSlots.map((slot,index)=>{
     const options=slotOptions(slot);
     const field=(name,label,values,placeholder)=>`<label class="field">${label}<select data-field="${name}" aria-label="${label}" data-empty="${!values.length}"><option value=""${name==='game'?' disabled':''}>${placeholder}</option>${values.map(([value,text])=>`<option value="${escapeHtml(value)}"${slot[name]===value?' selected':''}>${escapeHtml(text)}</option>`).join('')}</select></label>`;
-    return `<article class="ship-editor" data-slot="${slot.id}" aria-label="${escapeHtml(slotDisplayName(slot)||'Ship selection')}"><div class="editor-heading"><div><button type="button" class="icon-button" data-slot-action="clone" title="Clone ship" aria-label="Clone ship">${glyph('Copy')}</button><button type="button" class="icon-button" data-slot-action="remove" title="Remove ship" aria-label="Remove ship">${glyph('X')}</button></div></div>
+    return `<article class="ship-editor" data-slot="${slot.id}" aria-label="${escapeHtml(slotDisplayName(slot)||'Ship selection')}"><div class="editor-heading"><button type="button" class="icon-button reorder-handle" data-reorder-handle data-empty="${shipSlots.length<2}" title="Reorder ship" aria-label="Move ship card ${index+1}">${glyph('GripVertical')}</button><div><button type="button" class="icon-button" data-slot-action="clone" title="Clone ship" aria-label="Clone ship">${glyph('Copy')}</button><button type="button" class="icon-button" data-slot-action="remove" title="Remove ship" aria-label="Remove ship">${glyph('X')}</button></div></div>
       <label class="field">Ship name<span class="ship-name-value"><input type="text" data-field="customName" aria-label="Ship name" maxlength="80" value="${escapeHtml(slotDisplayName(slot))}">${activeGame==='mixed'?'<span class="ship-game-suffix">('+gameLabels[slotGame(slot)]+')</span>':''}</span></label>
       ${activeGame==='mixed'?field('game','Game',actualGames.map(game=>[game,gameLabels[game]]),'Select game'):''}
       ${field('version','Version',catalog.datasets.filter(d=>d.game===slotGame(slot)).map(d=>[d.version,d.version]),'Select version')}
@@ -135,6 +137,8 @@ ui('comparison-tabs').addEventListener('keydown',event=>{
   if(next!=null){event.preventDefault();selectComparisonRole(kinds[next],true);}
 });
 function renderComparison(focus=null) {
+  const positions=new Map(shipSlots.map((slot,index)=>[slot.id,index]));
+  selections.sort((a,b)=>(positions.get(a.slotId)??shipSlots.length)-(positions.get(b.slotId)??shipSlots.length));
   const kinds=comparisonKinds(),previousRole=comparisonRole;
   if(!kinds.includes(comparisonRole))comparisonRole=kinds[0]||'bomb';
   if(previousRole!==comparisonRole){
@@ -256,6 +260,70 @@ async function switchDataset(game,version) {
 }
 for(const button of document.querySelectorAll('[data-game]'))button.addEventListener('click',()=>switchDataset(button.dataset.game,gameVersions.get(button.dataset.game)||defaultVersion(button.dataset.game)));
 ui('add-ship').addEventListener('click',()=>{if(busy||shipSlots.length>=12)return;shipSlots.push(newSlot());renderLibrary();ui('ship-editors').lastElementChild.querySelector('select')?.focus();});
+function moveShipSlot(id,targetId,after=false){
+  if(busy||id===targetId)return;
+  const from=shipSlots.findIndex(slot=>slot.id===id);
+  if(from<0||!shipSlots.some(slot=>slot.id===targetId))return;
+  const [slot]=shipSlots.splice(from,1),target=shipSlots.findIndex(slot=>slot.id===targetId);
+  shipSlots.splice(target+(after?1:0),0,slot);
+  renderLibrary();renderComparison();
+  ui('ship-editors').querySelector(`[data-slot="${id}"] [data-reorder-handle]`)?.focus({preventScroll:true});
+  notice((slotDisplayName(slot)||'Ship card')+' moved to position '+(shipSlots.indexOf(slot)+1)+'.');
+}
+function clearSlotDrop(){
+  for(const card of ui('ship-editors').querySelectorAll('[data-drop-side]')){delete card.dataset.dropSide;delete card.dataset.dropAxis;}
+}
+function cancelSlotDrag(){
+  const drag=slotDrag;slotDrag=null;
+  if(drag){cancelAnimationFrame(drag.frame);if(drag.handle.hasPointerCapture(drag.pointerId))drag.handle.releasePointerCapture(drag.pointerId);}
+  for(const card of ui('ship-editors').querySelectorAll('.is-dragging'))card.classList.remove('is-dragging');
+  document.body.classList.remove('ship-reordering');clearSlotDrop();
+}
+function updateSlotDrop(){
+  const drag=slotDrag;if(!drag?.moved)return;
+  clearSlotDrop();drag.targetId=null;
+  const target=document.elementFromPoint(drag.x,drag.y)?.closest('.ship-editor');
+  if(!target||!ui('ship-editors').contains(target)||Number(target.dataset.slot)===drag.id)return;
+  const rect=target.getBoundingClientRect(),source=drag.card.getBoundingClientRect();
+  const horizontal=Math.abs(rect.top-source.top)<Math.min(rect.height,source.height)/2;
+  drag.after=horizontal?drag.x>rect.left+rect.width/2:drag.y>rect.top+rect.height/2;
+  drag.targetId=Number(target.dataset.slot);target.dataset.dropSide=drag.after?'after':'before';target.dataset.dropAxis=horizontal?'x':'y';
+}
+function scrollSlotDrag(){
+  const drag=slotDrag;if(!drag)return;
+  if(drag.moved){
+    const edge=60,delta=drag.y<edge?-12:drag.y>innerHeight-edge?12:0;
+    if(delta){window.scrollBy(0,delta);updateSlotDrop();}
+  }
+  drag.frame=requestAnimationFrame(scrollSlotDrag);
+}
+ui('ship-editors').addEventListener('pointerdown',event=>{
+  const handle=event.target.closest('[data-reorder-handle]');
+  if(!handle||handle.disabled||busy||event.button!==0||!event.isPrimary||slotDrag)return;
+  const card=handle.closest('.ship-editor');handle.focus({preventScroll:true});
+  slotDrag={id:Number(card.dataset.slot),handle,card,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,targetId:null};
+  handle.setPointerCapture(event.pointerId);event.preventDefault();scrollSlotDrag();
+});
+ui('ship-editors').addEventListener('pointermove',event=>{
+  const drag=slotDrag;if(!drag||drag.pointerId!==event.pointerId)return;
+  drag.x=event.clientX;drag.y=event.clientY;
+  if(!drag.moved&&Math.hypot(drag.x-drag.startX,drag.y-drag.startY)>=5){drag.moved=true;drag.card.classList.add('is-dragging');document.body.classList.add('ship-reordering');}
+  updateSlotDrop();if(drag.moved)event.preventDefault();
+});
+ui('ship-editors').addEventListener('pointerup',event=>{
+  const drag=slotDrag;if(!drag||drag.pointerId!==event.pointerId)return;
+  drag.x=event.clientX;drag.y=event.clientY;updateSlotDrop();cancelSlotDrag();
+  if(drag.moved&&drag.targetId!=null)moveShipSlot(drag.id,drag.targetId,drag.after);
+});
+for(const type of ['pointercancel','lostpointercapture'])ui('ship-editors').addEventListener(type,event=>{if(slotDrag?.pointerId===event.pointerId)cancelSlotDrag();});
+ui('ship-editors').addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&slotDrag){event.preventDefault();cancelSlotDrag();return;}
+  const handle=event.target.closest('[data-reorder-handle]');if(!handle||handle.disabled||busy)return;
+  const id=Number(handle.closest('[data-slot]').dataset.slot),index=shipSlots.findIndex(slot=>slot.id===id);
+  const to=['ArrowLeft','ArrowUp'].includes(event.key)?index-1:['ArrowRight','ArrowDown'].includes(event.key)?index+1:event.key==='Home'?0:event.key==='End'?shipSlots.length-1:null;
+  if(to==null)return;event.preventDefault();
+  if(to>=0&&to<shipSlots.length&&to!==index)moveShipSlot(id,shipSlots[to].id,to>index);
+});
 function removeSlot(id) {
   const index=shipSlots.findIndex(slot=>slot.id===id);if(index>=0)shipSlots.splice(index,1);
   const item=selections.find(item=>item.slotId===id);if(item)selections.splice(selections.indexOf(item),1);
