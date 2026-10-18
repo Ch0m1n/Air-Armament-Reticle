@@ -9,7 +9,7 @@ let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
 let activeGame='korabli',activeVersion='';
 let comparisonRole='bomb';
 let torpedoFullRange=false;
-const torpedoDistanceLimit=()=>torpedoFullRange?Infinity:1500;
+const torpedoDistanceLimit=()=>torpedoFullRange?Infinity:1000;
 const shipSlots=[];let nextSlot=1;
 let slotDrag=null;
 const selectionSources=new Map();let modifierSlotId=null;
@@ -118,7 +118,7 @@ function sourceData(item) {
 function cardTools(item) {
   const id=item.id;
   return `<div class="reference-tools"><button type="button" data-action="reference" data-id="${id}" aria-pressed="${!!item.reference}" title="Yamato reference (263 × 38.9 m)"><img src="${YAMATO_IMAGE}" alt="">Yamato</button>
-    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:`<span class="range-modes" role="group" aria-label="Torpedo display range">${[['near','1.5 km'],['full','Full range']].map(([mode,label])=>`<button type="button" data-action="range-${mode}" data-id="${id}" aria-pressed="${torpedoFullRange===(mode==='full')}">${label}</button>`).join('')}</span>`}
+    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:`<span class="range-modes" role="group" aria-label="Torpedo display range">${[['near','1 km'],['full','Full range']].map(([mode,label])=>`<button type="button" data-action="range-${mode}" data-id="${id}" aria-pressed="${torpedoFullRange===(mode==='full')}">${label}</button>`).join('')}</span>`}
     ${['bomb','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${item.kind==='bomb'?'Simulate bomb drops':'Simulate airstrike'}" title="${item.kind==='bomb'?'Illustrative bomb drops; not game RNG':'Simulate airstrike'}"${item.kind==='bomb'?bomberPayload(item)&&bomberSimulationRegion(item).outer?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${item.kind==='bomb'?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${label}</button>`).join('')}</div>`:''}`;
 }
 function renderComparisonTabs() {
@@ -273,24 +273,63 @@ function moveShipSlot(id,targetId,after=false){
   ui('ship-editors').querySelector(`[data-slot="${id}"] [data-reorder-handle]`)?.focus({preventScroll:true});
   notice((slotDisplayName(slot)||'Ship card')+' moved to position '+(shipSlots.indexOf(slot)+1)+'.');
 }
-function clearSlotDrop(){
-  for(const card of ui('ship-editors').querySelectorAll('[data-drop-side]')){delete card.dataset.dropSide;delete card.dataset.dropAxis;}
+function previewSlotOrder(drag,index){
+  if(drag.previewIndex===index)return;
+  const before=drag.cards.map(card=>card.getBoundingClientRect());
+  const order=drag.cards.slice(),from=order.indexOf(drag.card);
+  order.splice(from,1);order.splice(index,0,drag.card);
+  order.forEach((card,position)=>{card.style.order=position;});
+  drag.previewIndex=index;
+  drag.cards.forEach((card,i)=>{
+    drag.animations.get(card)?.cancel();
+    if(card===drag.card||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const rect=card.getBoundingClientRect(),x=before[i].left-rect.left,y=before[i].top-rect.top;
+    if(x||y)drag.animations.set(card,card.animate([{transform:`translate(${x}px,${y}px)`},{transform:'none'}],{duration:160,easing:'ease-out'}));
+  });
 }
-function cancelSlotDrag(){
+function liftSlotCard(drag){
+  const rect=drag.card.getBoundingClientRect(),preview=drag.card.cloneNode(true);
+  preview.classList.add('ship-drag-preview');preview.removeAttribute('data-slot');
+  preview.setAttribute('aria-hidden','true');preview.inert=true;
+  preview.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+  const fields=drag.card.querySelectorAll('input,select');
+  preview.querySelectorAll('input,select').forEach((field,index)=>{field.value=fields[index].value;});
+  preview.style.width=rect.width+'px';preview.style.height=rect.height+'px';
+  drag.offsetX=drag.startX-rect.left;drag.offsetY=drag.startY-rect.top;drag.preview=preview;
+  drag.cards=[...ui('ship-editors').children];drag.animations=new Map();
+  // Stable grid cells prevent animated neighbours from changing the drop target.
+  drag.cells=drag.cards.map(card=>{const box=card.getBoundingClientRect();return {left:box.left+scrollX,top:box.top+scrollY,right:box.right+scrollX,bottom:box.bottom+scrollY};});
+  document.body.append(preview);drag.card.classList.add('is-dragging');document.body.classList.add('ship-reordering');
+}
+function cancelSlotDrag(settle=false){
   const drag=slotDrag;slotDrag=null;
-  if(drag){cancelAnimationFrame(drag.frame);if(drag.handle.hasPointerCapture(drag.pointerId))drag.handle.releasePointerCapture(drag.pointerId);}
+  if(drag){
+    cancelAnimationFrame(drag.frame);
+    if(drag.handle.hasPointerCapture(drag.pointerId))drag.handle.releasePointerCapture(drag.pointerId);
+    if(drag.preview){
+      const rect=drag.card.getBoundingClientRect(),preview=drag.preview;
+      if(settle&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+        const animation=preview.animate([{transform:preview.style.transform},{transform:`translate(${rect.left}px,${rect.top}px) scale(1)`}],{duration:140,easing:'ease-out',fill:'forwards'});
+        animation.finished.then(()=>preview.remove(),()=>preview.remove());
+      }else preview.remove();
+      drag.animations.forEach(animation=>animation.cancel());drag.cards.forEach(card=>card.style.removeProperty('order'));
+    }
+  }
   for(const card of ui('ship-editors').querySelectorAll('.is-dragging'))card.classList.remove('is-dragging');
-  document.body.classList.remove('ship-reordering');clearSlotDrop();
+  document.body.classList.remove('ship-reordering');
+  if(drag?.moved&&drag.handle.isConnected)drag.handle.focus({preventScroll:true});
 }
 function updateSlotDrop(){
   const drag=slotDrag;if(!drag?.moved)return;
-  clearSlotDrop();drag.targetId=null;
-  const target=document.elementFromPoint(drag.x,drag.y)?.closest('.ship-editor');
-  if(!target||!ui('ship-editors').contains(target)||Number(target.dataset.slot)===drag.id)return;
-  const rect=target.getBoundingClientRect(),source=drag.card.getBoundingClientRect();
-  const horizontal=Math.abs(rect.top-source.top)<Math.min(rect.height,source.height)/2;
-  drag.after=horizontal?drag.x>rect.left+rect.width/2:drag.y>rect.top+rect.height/2;
-  drag.targetId=Number(target.dataset.slot);target.dataset.dropSide=drag.after?'after':'before';target.dataset.dropAxis=horizontal?'x':'y';
+  drag.preview.style.transform=`translate(${drag.x-drag.offsetX}px,${drag.y-drag.offsetY}px) scale(1.02)`;
+  drag.targetId=null;
+  const bounds=ui('ship-editors').getBoundingClientRect();
+  if(drag.x<bounds.left-20||drag.x>bounds.right+20||drag.y<bounds.top-20||drag.y>bounds.bottom+20)return;
+  const x=drag.x+scrollX,y=drag.y+scrollY;
+  const distances=drag.cells.map(rect=>Math.hypot(Math.max(rect.left-x,0,x-rect.right),Math.max(rect.top-y,0,y-rect.bottom)));
+  const index=distances.indexOf(Math.min(...distances)),from=drag.cards.indexOf(drag.card);
+  previewSlotOrder(drag,index);
+  if(index!==from){drag.targetId=Number(drag.cards[index].dataset.slot);drag.after=index>from;}
 }
 function scrollSlotDrag(){
   const drag=slotDrag;if(!drag)return;
@@ -310,17 +349,18 @@ ui('ship-editors').addEventListener('pointerdown',event=>{
 ui('ship-editors').addEventListener('pointermove',event=>{
   const drag=slotDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   drag.x=event.clientX;drag.y=event.clientY;
-  if(!drag.moved&&Math.hypot(drag.x-drag.startX,drag.y-drag.startY)>=5){drag.moved=true;drag.card.classList.add('is-dragging');document.body.classList.add('ship-reordering');}
+  if(!drag.moved&&Math.hypot(drag.x-drag.startX,drag.y-drag.startY)>=5){drag.moved=true;liftSlotCard(drag);}
   updateSlotDrop();if(drag.moved)event.preventDefault();
 });
 ui('ship-editors').addEventListener('pointerup',event=>{
   const drag=slotDrag;if(!drag||drag.pointerId!==event.pointerId)return;
-  drag.x=event.clientX;drag.y=event.clientY;updateSlotDrop();cancelSlotDrag();
+  drag.x=event.clientX;drag.y=event.clientY;updateSlotDrop();cancelSlotDrag(drag.moved&&drag.targetId!=null);
   if(drag.moved&&drag.targetId!=null)moveShipSlot(drag.id,drag.targetId,drag.after);
 });
 for(const type of ['pointercancel','lostpointercapture'])ui('ship-editors').addEventListener(type,event=>{if(slotDrag?.pointerId===event.pointerId)cancelSlotDrag();});
+window.addEventListener('resize',()=>{if(slotDrag)cancelSlotDrag();});
+window.addEventListener('keydown',event=>{if(event.key==='Escape'&&slotDrag){event.preventDefault();cancelSlotDrag();}});
 ui('ship-editors').addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&slotDrag){event.preventDefault();cancelSlotDrag();return;}
   const handle=event.target.closest('[data-reorder-handle]');if(!handle||handle.disabled||busy)return;
   const id=Number(handle.closest('[data-slot]').dataset.slot),index=shipSlots.findIndex(slot=>slot.id===id);
   const to=['ArrowLeft','ArrowUp'].includes(event.key)?index-1:['ArrowRight','ArrowDown'].includes(event.key)?index+1:event.key==='Home'?0:event.key==='End'?shipSlots.length-1:null;
