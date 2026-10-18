@@ -26,7 +26,7 @@ for(const [folder,game]of [['WOWS','wows'],['KORABLI','korabli']]) {
       const shipFile=base+'/Ships/'+filename,ship=read(shipFile),code=ship.name.split('_')[0];
       if(/DISABLED|PRESERVED/i.test(ship.name))continue;
       if(['disabled','preserved'].includes(String(ship.group||'').toLowerCase()))continue;
-      for(const ref of core.shipManifest(ship,filename).aircraft) {
+      for(const ref of core.strikeAircraftReferences(core.shipManifest(ship,filename))) {
         const planeFile=fileFor('Aircraft',ref.id);if(!planeFile)continue;
         const plane=read(planeFile),weaponId=core.aircraftWeaponId(plane);
         const weaponFile=fileFor('Projectiles',weaponId);if(!weaponFile)continue;

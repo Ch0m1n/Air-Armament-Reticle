@@ -55,6 +55,7 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     assert.equal(await page.locator('.ship-editor').count(),3);assert.equal(await page.locator('[role="tab"]').count(),3);
     const tabKinds=()=>page.locator('[data-comparison-tab]').evaluateAll(tabs=>tabs.map(tab=>tab.dataset.comparisonTab));
     assert.deepEqual(await tabKinds(),['bomb','torpedo','airstrike']);
+    assert(await page.evaluate(()=>!catalog.entries.some(e=>e.shipId==='TEST_FLOAT_ONLY'||e.aircraft==='TEST_FLOAT_FIGHTER')));
     assert.equal(new URL(page.url()).searchParams.get('type'),'bomb');
     await page.locator('#comparison-tab-bomb').focus();await page.keyboard.press('ArrowLeft');
     assert.equal(await page.locator('[role="tab"][aria-selected="true"]').getAttribute('data-comparison-tab'),'airstrike');

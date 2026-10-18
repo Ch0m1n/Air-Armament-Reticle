@@ -20,7 +20,11 @@ export function writeFixtureDataset(root,game='KORABLI',version='fixture-A',incl
   if(includeSkip){ship.A_SkipBomber={planes:[skip.name]};projectiles.push({name:'TEST_SKIP_BOMB',typeinfo:{type:'Projectile',species:'SkipBomb'},ammoType:'HE',planeAmmoType:'skip'});}
   const write=(folder,value)=>fs.writeFileSync(path.join(base,folder,value.name+'.json'),JSON.stringify(value)+'\n');
   write('Ships',ship);for(const plane of [bomb,torpedo,researched,airstrike])write('Aircraft',plane);for(const weapon of projectiles)write('Projectiles',weapon);
-  if(includeAttack)write('Aircraft',attack);
+  if(includeAttack){
+    write('Aircraft',attack);
+    const float={...attack,name:'TEST_FLOAT_FIGHTER'};write('Aircraft',float);
+    write('Ships',{name:'TEST_FLOAT_ONLY',typeinfo:{type:'Ship',nation:'TestNation',species:'Battleship'},A_Hull:{consumablePlaneTypes:{fighter:float.name}}});
+  }
   if(includeSkip)write('Aircraft',skip);
   fs.writeFileSync(path.join(base,'dataset.json'),JSON.stringify({dataset:'Synthetic test fixture',snapshot:null,default:game==='KORABLI',defaults:[bomb,researched,airstrike].map(plane=>'TST001--'+plane.name)})+'\n');
 }

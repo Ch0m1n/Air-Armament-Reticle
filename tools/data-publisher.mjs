@@ -87,7 +87,7 @@ export function collectDataset({source,game,version,onProgress=()=>{},shipSubset
     }
     catch(error){throw Error(filename+': '+error.message);}
     const eligibleAircraft=[];let excludedAsw=0,excludedOther=0;
-    for(const reference of manifest.aircraft){
+    for(const reference of core.strikeAircraftReferences(manifest)){
       try{
         const plane=read('Aircraft',reference.id),projectile=core.aircraftWeaponId(plane);
         if(!validId(projectile))throw Error('No supported weapon reference');

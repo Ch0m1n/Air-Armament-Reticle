@@ -138,6 +138,27 @@ test('preview selects only connected supported JSON and excludes ASW and unrelat
   assert.equal(plan.files.size,9);assert(![...plan.files.keys()].some(file=>/UNREFERENCED|credentials|TEST_DC|TEST_ASW/.test(file)));
   assert.equal(plan.summary.repository,repository);
 });
+test('consumable fighter rockets do not turn ordinary ships into attack carriers',async()=>{
+  const folder=sourceFixture('consumable-fighter');
+  const p=JSON.parse(fs.readFileSync(path.join(folder,'Aircraft/TEST_BOMBER.json')));
+  const plane={...p,name:'TEST_FLOAT_FIGHTER',bombName:'TEST_FIGHTER_ROCKET'};
+  const weapon={name:'TEST_FIGHTER_ROCKET',typeinfo:{type:'Projectile',species:'Rocket'},ammoType:'HE',planeAmmoType:'rocket'};
+  const ship={name:'TEST_CRUISER',typeinfo:{type:'Ship',species:'Cruiser'},A_Hull:{consumablePlaneTypes:{fighter:plane.name}}};
+  fs.writeFileSync(path.join(folder,'Ships/TEST_CRUISER.json'),JSON.stringify(ship));
+  fs.writeFileSync(path.join(folder,'Aircraft',plane.name+'.json'),JSON.stringify(plane));
+  fs.writeFileSync(path.join(folder,'Projectiles',weapon.name+'.json'),JSON.stringify(weapon));
+  let plan=collectDataset({...options,source:folder});
+  assert(!plan.summary.shipDecisions.find(r=>r.ship===ship.name).included);
+  assert(![...plan.files.keys()].some(f=>f.includes('FLOAT_FIGHTER')||f.includes('FIGHTER_ROCKET')));
+  ship.A_Fighter={planes:[plane.name]};
+  fs.writeFileSync(path.join(folder,'Ships/TEST_CRUISER.json'),JSON.stringify(ship));
+  plan=collectDataset({...options,source:folder});
+  assert(plan.summary.shipDecisions.find(r=>r.ship===ship.name).included);
+  assert([...plan.files.keys()].some(f=>f.endsWith('/TEST_FLOAT_FIGHTER.json')));
+  const parallel=await collectDatasetParallel({...options,source:folder,concurrency:2});
+  assert.equal(plan.summary.manifestHash,parallel.summary.manifestHash);
+});
+
 test('skip-only ships and their referenced files are retained without geometry, including parallel scans',async()=>{
   const folder=sourceFixture('skip-data-only');
   const plane={name:'TEST_SKIP_PLANE',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB'};

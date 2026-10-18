@@ -73,6 +73,16 @@ function shipManifest(raw,filename) {
   }
   return {name:raw.name,filename,aircraft,abilities,timingSupports:airstrikeTimingSupports(raw)};
 }
+function strikeAircraftReferences(manifest) {
+  return manifest.aircraft.flatMap(ref=>{
+    const contexts=ref.contexts.filter(context=>{
+      const parts=context.split(' / '),key=parts.at(-1);
+      if(parts.some(part=>/^consumable|^(fightersName|scoutName|spotterName)$/i.test(part)))return false;
+      return key==='planes'||parts.some(part=>/airsupport/i.test(part))&&['planeName','ammoList'].includes(key);
+    });
+    return contexts.length?[{...ref,contexts}]:[];
+  });
+}
 function aircraftAbilities(manifest,abilities) {
   return manifest.abilities.flatMap(ref=>{
     const file=abilities.get(ref.id),profile=file&&Object.hasOwn(file,ref.profile)?file[ref.profile]:null;

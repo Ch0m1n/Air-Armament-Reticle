@@ -15,7 +15,7 @@ const shipFiles=fs.readdirSync(path.join(input,folders.Ships));
 for(const code of selected) {
   const filename=shipFiles.find(name=>name.startsWith(code+'_')&&name.endsWith('.json'));if(!filename)continue;
   const ship=read('Ships',filename.slice(0,-5));store('Ships',ship);
-  for(const ref of core.shipManifest(ship,filename).aircraft) {
+  for(const ref of core.strikeAircraftReferences(core.shipManifest(ship,filename))) {
     let plane,result,weapon;
     try{plane=read('Aircraft',ref.id);weapon=read('Projectiles',core.aircraftWeaponId(plane));result=core.aircraftRecord(plane,ref.id+'.json',weapon);if(!result.projectile)continue;
       if(result.kind==='airstrike'){core.attachAirstrikeWeapon(result,weapon);if(!result.weaponVerified)continue;}

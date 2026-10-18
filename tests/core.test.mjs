@@ -91,6 +91,16 @@ test('attack aircraft require verified rocket identity; skip geometry remains ex
   assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,240);
 });
 
+test('strike references exclude consumable fighters and spotters without excluding cruiser attack squadrons',()=>{
+  const ship={name:'TEST_CRUISER',typeinfo:{type:'Ship',species:'Cruiser'},A_Fighter:{planes:['REAL_ATTACK']},A_Hull:{consumablePlaneTypes:{fighter:'FLOAT_FIGHTER',scout:'SPOTTER'},fightersName:'FIGHTER_OLD',spotterName:'SPOTTER_OLD'},A_AirSupport:{ammoList:['AIRSTRIKE']},A_FlightControl:{consumableSquadrons:[{planes:['PATROL']}]} };
+  const manifest=core.shipManifest(ship,'cruiser.json');
+  assert(manifest.aircraft.some(ref=>ref.id==='FLOAT_FIGHTER'));
+  assert.deepEqual(Array.from(core.strikeAircraftReferences(manifest),ref=>ref.id),['REAL_ATTACK','AIRSTRIKE']);
+  ship.A_Hull.consumablePlaneTypes.fighter='REAL_ATTACK';
+  const shared=core.strikeAircraftReferences(core.shipManifest(ship,'cruiser.json')).find(ref=>ref.id==='REAL_ATTACK');
+  assert.deepEqual(Array.from(shared.contexts),['A_Fighter / planes']);
+});
+
 test('skip records retain matching dependencies without invoking any geometry',()=>{
   const plane={name:'TEST_SKIP',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB'};
   const weapon={name:'TEST_SKIP_BOMB',ammoType:'HE',planeAmmoType:'skip',typeinfo:{type:'Projectile',species:'SkipBomb'}};

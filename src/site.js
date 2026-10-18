@@ -445,6 +445,11 @@ async function importFiles(list) {
     for(const [name,file]of uploadedAircraft) {
       try {
         const old=selections.find(item=>!item.catalogId&&item.name===name);
+        const manifests=[...uploadedShips.values()];
+        if(manifests.some(ship=>ship.aircraft.some(ref=>ref.id===name))&&!manifests.some(ship=>strikeAircraftReferences(ship).some(ref=>ref.id===name))){
+          if(old)selections.splice(selections.indexOf(old),1);
+          continue;
+        }
         if(!old&&selections.length>=12)continue;
         const weapon=uploadedWeapons.get(aircraftWeaponId(file.raw));
         const item=aircraftRecord(file.raw,file.filename,weapon);attachData(item,weapon,[...uploadedShips.values()]);
