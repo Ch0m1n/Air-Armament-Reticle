@@ -10,24 +10,34 @@ let browser;
  browser=await chromium.launch({headless:true,executablePath:process.env.MK_CHROME_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
+ await require('./static-preview.cjs').installStaticPreview(page);
  await page.goto(process.env.RETICLE_REFERENCE_URL||pathToFileURL(path.resolve(__dirname,'../dist/skip-bombers/index.html')).href);
- await page.waitForFunction(()=>JSON.parse(document.querySelector('#linked').dataset.sideTarget||'{}').mode==='front');
+ await page.waitForFunction(()=>JSON.parse(document.querySelector('#linked').dataset.sideTarget||'{}').mode==='image-morph');
  const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
- async function heading(n){await page.locator('#heading').evaluate((e,n)=>{e.value=n;e.dispatchEvent(new Event('input',{bubbles:true}))},n);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));return page.locator('#linked').evaluate(c=>({target:JSON.parse(c.dataset.sideTarget),exaggeration:Number(c.dataset.sideVerticalExaggeration)}))}
- for(const angle of [0,180]){
+ async function heading(n){
+  await page.locator('#heading').evaluate((e,n)=>{e.value=n;e.dispatchEvent(new Event('input',{bubbles:true}))},n);
+  await page.waitForFunction(n=>JSON.parse(document.querySelector('#linked').dataset.sideTarget||'{}').heading===n,n);
+  return page.locator('#linked').evaluate(c=>({target:JSON.parse(c.dataset.sideTarget),exaggeration:Number(c.dataset.sideVerticalExaggeration)}));
+ }
+ const baseline=(await heading(0)).target,images=[];
+ for(const angle of [0,1,7.3,9.9,10.1,37.4,45,75,89.9,90,90.1,123.4,179,180]){
   const {target:t,exaggeration}=await heading(angle);
-  assert.equal(t.mode,'front');assert.equal(exaggeration,1);
-  near(t.height/t.width,front.crop.height/front.crop.width);
-  near((t.imageBottomY-t.waterlineY)/t.width,(front.crop.y+front.crop.height-642)/front.crop.width);
-  near((t.waterlineY-t.top)/t.height,(642-front.crop.y)/front.crop.height);
-  near(t.keelY,t.imageBottomY);
-  await page.locator('#single').screenshot({path:path.join(artifacts,`skip-reference-${angle}-proportions.png`)});
+  assert.equal(t.mode,'image-morph');assert.equal(t.ready,true);assert.equal(t.frameCount,21);assert.equal(exaggeration,1);
+  for(const key of ['left','top','width','height','waterlineY','pixelsPerMapMeter'])near(t[key],baseline[key]);
+  near(t.height/t.width,120/560);near((t.waterlineY-t.top)/t.height,.8);
+  images.push(await page.evaluate(a=>MKYamatoRotation.frame(a).src,angle));
  }
- for(const angle of [1,179]){
-  const {target:t}=await heading(angle);assert.equal(t.mode,'schematic');assert.equal(t.profileModel,'front-side-top intersection');
-  await page.locator('#single').screenshot({path:path.join(artifacts,`skip-reference-${angle}-profile.png`)});
- }
- const {target:s,exaggeration}=await heading(90);assert.equal(s.mode,'side');assert.equal(exaggeration,1);near(s.height/s.width,side.crop.height/side.crop.width);
+ assert.equal(new Set(images).size,images.length,'No nearest-angle snapping');
+ await heading(37.4);await page.locator('#single').screenshot({path:path.join(artifacts,'skip-reference-continuous-37-4.png')});
+
+ // The new display remains draggable without changing the salvo sample.
+ const before=await page.evaluate(()=>({target:previewState.target,seed:previewState.salvoSeed}));
+ await page.locator('#linked').scrollIntoViewIfNeeded();
+ const rect=await page.locator('#linked').boundingBox(),point=await page.locator('#linked').evaluate(c=>({x:Number(c.dataset.targetSideX),y:JSON.parse(c.dataset.sideTarget).waterlineY-5}));
+ await page.mouse.move(rect.x+point.x,rect.y+point.y);await page.mouse.down();await page.mouse.move(rect.x+point.x+70,rect.y+point.y,{steps:5});await page.mouse.up();
+ assert.ok(await page.evaluate(old=>previewState.target>old,before.target));assert.equal(await page.evaluate(()=>previewState.salvoSeed),before.seed);
+ await page.locator('#targetPosition').fill(String(before.target));await page.locator('#targetPosition').press('Tab');
+ await heading(90);
  // A real moving bomb's vertical offset must use exactly the horizontal scale.
  await page.locator('#time').evaluate(e=>{e.value=400;e.dispatchEvent(new Event('input',{bubbles:true}))});await page.waitForTimeout(50);
  const marker=await page.locator('#linked').evaluate(c=>{
@@ -38,5 +48,5 @@ let browser;
  });
  assert.ok(marker,'Moving marker is visible for equal-scale pixel check');assert.ok(marker[0]>150&&marker[1]>60&&marker[3]>0);
  assert.deepEqual(errors,[]);
- console.log('PASS: unmodified front/side aspect ratios, user-marked submerged boundary at 0/180, matching keel, equal XY trajectory marker and no page errors.');
+ console.log('PASS: 21 image-based angle samples, continuous fractional rotation, fixed scale/center/waterline, dragging, equal XY marker and no page errors.');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await browser?.close()});

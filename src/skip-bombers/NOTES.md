@@ -79,3 +79,8 @@ Changing target position, heading, dispersion or release offset updates contacts
 Rewind and reset clear visible markers until their contact times are reached.
 No armor penetration, damage, underwater-strike or verified game RNG simulation
 is included. Game-derived imagery belongs to its respective rights holders.
+
+
+## Continuous Yamato rotation (2026-11-14)
+
+The side-view renderer now uses the same registered 21 angle samples as MKTool. Signed-distance interpolation generates one continuous silhouette at fractional headings, rather than snapping or crossfading image outlines. Rendering uses fixed map-meter coordinates, a fixed waterline and common viewport extents so changing heading does not change scale. The source captures are represented by compact alpha-derived fields in `assets/yamato-rotation-data.js`; `rotation.js` decodes them lazily and draws directly to the canvas. The trajectory and approximate height-aware contact model are unchanged. Existing timing comparisons, shared elapsed seconds and per-salvo samples are preserved.

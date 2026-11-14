@@ -6,6 +6,7 @@ let browser;
  browser=await chromium.launch({headless:true,executablePath:process.env.MK_CHROME_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
+ await require('./static-preview.cjs').installStaticPreview(page);
  const base=process.env.RETICLE_SITE_URL||'http://127.0.0.1:8776/';
  await page.goto(base);await page.waitForFunction(()=>typeof catalog!=='undefined'&&catalog&&!busy);
  const entries=await page.evaluate(()=>['PFAL501_Bearn_stock','PRAL902_A_NAKHIMOV_TOP'].map(name=>catalog.entries.find(e=>e.aircraft===name&&e.datasetId.startsWith('korabli'))));
@@ -14,7 +15,7 @@ let browser;
  const frames=async()=>{
   const nodes=await page.locator('#comparison-skip iframe').elementHandles();assert.equal(nodes.length,2);
   const result=[];
-  for(const node of nodes){await node.waitForElementState('visible');const f=await node.contentFrame();await f.waitForFunction(()=>window.setSkipSharedScale&&document.querySelector(previewState.view==='compare'?'#reference':'#linked').dataset.bombs);result.push(f)}
+  for(const node of nodes){await node.waitForElementState('visible');const f=await node.contentFrame();await f.waitForFunction(()=>window.setSkipSharedScale&&MKYamatoRotation.ready&&JSON.parse(document.querySelector(previewState.view==='compare'?'#reference':'#linked').dataset.sideTarget||'{}').ready);result.push(f)}
   return result;
  };
  const scales=()=>page.evaluate(()=>Array.from(document.querySelectorAll('#comparison-skip iframe')).flatMap(frame=>{
@@ -24,7 +25,8 @@ let browser;
   await page.waitForFunction(()=>{
    const fs=Array.from(document.querySelectorAll('#comparison-skip iframe'));
    const cs=fs.flatMap(f=>Array.from(f.contentDocument.querySelectorAll('canvas')).filter(c=>c.getBoundingClientRect().width>0));
-   return cs.length>=2&&cs.every(c=>c.dataset.sharedScale==='true'&&Number(c.dataset.topPixelsPerMapMeter)>0&&Math.abs(Number(c.dataset.topPixelsPerMapMeter)-Number(cs[0].dataset.topPixelsPerMapMeter))<1e-10&&Math.abs(Number(c.dataset.sidePixelsPerMapMeter)-Number(cs[0].dataset.sidePixelsPerMapMeter))<1e-10);
+   const top=Math.min(...cs.map(c=>Number(c.dataset.requestedTopScale))),side=Math.min(...cs.map(c=>Number(c.dataset.requestedSideScale)));
+   return cs.length>=2&&cs.every(c=>c.dataset.sharedScale==='true'&&Number(c.dataset.topPixelsPerMapMeter)>0&&c.dataset.sideRange===c.ownerDocument.querySelector('#sideRange').value&&Math.abs(Number(c.dataset.topPixelsPerMapMeter)-top)<1e-10&&Math.abs(Number(c.dataset.sidePixelsPerMapMeter)-side)<1e-10);
   });
   const values=await scales();values.forEach(s=>assert.ok(Math.abs(s.hull/s.top-526)<1e-8));return values;
  };
@@ -52,6 +54,16 @@ let browser;
  // Timing comparison may have narrower canvases, but all compared ships stay to scale.
  await fs[0].getByRole('button',{name:'Timing comparison',exact:true}).click();await equal();
  assert.equal((await scales()).length,4);
+ // Continuous image rotation keeps every timing/ship canvas registered to its waterline.
+ const imageGeometry=()=>page.evaluate(()=>Array.from(document.querySelectorAll('#comparison-skip iframe')).flatMap(f=>Array.from(f.contentDocument.querySelectorAll('canvas')).filter(c=>c.getBoundingClientRect().width>0).map(c=>{const t=JSON.parse(c.dataset.sideTarget);return [t.left,t.top,t.width,t.height,t.waterlineY,t.pixelsPerMapMeter]})));
+ const registered=await imageGeometry();
+ for(const angle of [9.9,10.1,37.4,123.4,180]){
+  const children=await frames();
+  await Promise.all(children.map(f=>f.locator('#heading').evaluate((e,a)=>{e.value=a;e.dispatchEvent(new Event('input',{bubbles:true}))},angle)));
+  await Promise.all(children.map(f=>f.waitForFunction(a=>Array.from(document.querySelectorAll('canvas')).filter(c=>c.getBoundingClientRect().width>0).every(c=>{const t=JSON.parse(c.dataset.sideTarget);return t.mode==='image-morph'&&t.heading===a}),angle)));
+  await equal();assert.deepEqual(await imageGeometry(),registered);
+ }
+
  await page.screenshot({path:path.join(artifacts,'T-skip-list-shared.png'),fullPage:true});
  await page.getByRole('button',{name:'Card view',exact:true}).click();await frames();await equal();
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);fs=await frames();await equal();
@@ -60,6 +72,6 @@ let browser;
  await page.getByRole('button',{name:'List view',exact:true}).click();await frames();await equal();
  await page.locator('#comparison-skip').screenshot({path:path.join(artifacts,'T-skip-mobile-shared.png')});
  assert.deepEqual(errors,[]);
- console.log('PASS: card/list geometry, shared top and side meters-to-pixels across ships and timing scenarios, independent scales, stable coordination, preserved salvos and mobile.');
+ console.log('PASS: card/list geometry, continuous image rotation and fixed waterlines across ships/timing scenarios, shared/independent scales, preserved salvos and mobile.');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await browser?.close()});
 

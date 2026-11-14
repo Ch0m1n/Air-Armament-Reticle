@@ -9,6 +9,7 @@ let browser;
  browser=await chromium.launch({headless:true,executablePath:process.env.MK_CHROME_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
+ await require('./static-preview.cjs').installStaticPreview(page);
  const base=process.env.RETICLE_SITE_URL||'http://127.0.0.1:8776/';
  await page.goto(base);await page.waitForFunction(()=>typeof catalog!=='undefined'&&catalog&&!busy);
  const entries=await page.evaluate(()=>['PFAL501_Bearn_stock','PRAL902_A_NAKHIMOV_TOP'].map(name=>catalog.entries.find(e=>e.aircraft===name&&e.datasetId.startsWith('korabli'))));

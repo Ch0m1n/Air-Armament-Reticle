@@ -50,7 +50,7 @@ html[data-theme="light"] button[aria-pressed="true"]{background:#deeee5!importan
  <aside aria-label="Target and release settings"><h2>Target &amp; release</h2>
   <div><label><span>Release offset <output id="offsetValue">0 m</output></span><input id="offset" type="range" min="-600" max="600" step="10" value="0" aria-label="Release offset"></label>
   <label><span>Comparison interval <output id="intervalValue">250 m</output></span><input id="interval" type="range" min="50" max="600" step="10" value="250" aria-label="Comparison interval"></label>
-  <label><span>Target heading <output id="headingValue">0°</output></span><input id="heading" type="range" min="0" max="180" value="0" aria-label="Target heading"></label>
+  <label><span>Target heading <output id="headingValue">0°</output></span><input id="heading" type="range" min="0" max="180" step="0.1" value="0" aria-label="Target heading"></label>
   <label>Top-view range<select id="topRange" aria-label="Top-view range" style="min-width:0;width:100%"><option value="detail">Target area</option><option value="all">Entire run</option></select></label>
   <label>Side-view range<select id="sideRange" aria-label="Side-view range" style="min-width:0;width:100%"><option value="detail">Target area</option><option value="all">Entire run</option></select></label>
   <div class="readout"><p><strong>Yamato</strong><span>263 × 38.9 m</span></p><span class="note">Native hull scale ×2<br>526 × 77.8 map-meter equivalent</span></div></div>
@@ -61,6 +61,7 @@ html[data-theme="light"] button[aria-pressed="true"]{background:#deeee5!importan
 <div class="stages"><table><thead><tr><th>Contact</th><th>From release</th><th>Line width · aimed</th><th>Line width · maximum</th><th>Along-track depth · aimed</th></tr></thead><tbody id="rows"></tbody></table></div>
 <footer><span>Client-equation baseline, not an in-game capture or hit-probability model. Level flight, normal throttle, no build effects. Yamato: 263 × 38.9 ship meters, rendered at native ship-to-map scale ×2.</span><a href="research/FINDINGS.md" target="_blank" rel="noopener">Calculation evidence</a></footer>
 </main>
+<script src="./yamato-rotation.js?v={{YAMATO_ROTATION_VERSION}}"></script>
 <script>
 'use strict';
 const DATA = /*__VERIFIED_DATA__*/null;
@@ -70,10 +71,8 @@ if (!DATA) {
 const HULL_TO_MAP=DATA.nativeEvidence.values.BW_TO_BALLISTIC/DATA.nativeEvidence.values.BW_TO_SHIP;
 const yamatoImage=new Image();yamatoImage.src=/*__YAMATO_IMAGE__*/null;yamatoImage.onload=()=>schedule();
 const FRONT=/*__FRONT_REFERENCE__*/null,SIDE_VERTICAL=1;
-const yamatoFront=new Image();yamatoFront.src=/*__YAMATO_FRONT__*/null;yamatoFront.onload=()=>schedule();
 const HULL=/*__HULL_REFERENCE__*/null,createHullContact=/*__HULL_CONTACT__*/null;
 const hullContact=createHullContact(HULL,HULL_TO_MAP,FRONT);
-const yamatoSide=new Image();yamatoSide.src=/*__YAMATO_SIDE__*/null;yamatoSide.onload=()=>schedule();
 const $ = id => document.getElementById(id);
 const state = {ship:0,aim:'full',view:'linked',target:0,center:0,progress:0,playing:false,offset:0,interval:250,heading:0,length:263,salvoSeed:11317};
 const embedded=new URLSearchParams(location.search).has('embedded');
@@ -84,7 +83,7 @@ document.documentElement.dataset.embedded=String(embedded);
 const plotGeometry=new Map();let drag=null,snapped=null;
 const colors={line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'};
 const fmt=n=>Math.round(n).toLocaleString('en-US');
-let frame=0,last=0,animation=0;
+let frame=0,last=0,animation=0,headingAnimation=0,targetHeading=0,headingTime=0;
 function current(){return DATA.rows[state.ship]}
 function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;drawAll()})}
 function syncShip(){
@@ -132,40 +131,16 @@ function target(ctx,x,y,scale,side=false){
  if(!side){if(!yamatoImage.complete||!yamatoImage.naturalWidth)return;ctx.save();ctx.translate(x,y);ctx.rotate(state.heading*Math.PI/180);ctx.filter='brightness(0) invert(0.72)';ctx.drawImage(yamatoImage,1,3,155,998,-beam/2,-length/2,beam,length);ctx.restore();return}
  const verticalScale=scale*HULL_TO_MAP*SIDE_VERTICAL;
  const deckY=y-FRONT.deckHeightMeters*verticalScale,keelY=y+FRONT.draftMeters*verticalScale;
- if((state.heading===0||state.heading===180)&&yamatoFront.complete&&yamatoFront.naturalWidth){
-  const crop=FRONT.crop,pixelsPerShipMeter=crop.width/FRONT.beamMeters;
-  const imageScaleY=verticalScale/pixelsPerShipMeter;
-  const width=FRONT.beamMeters*HULL_TO_MAP*scale,height=crop.height*imageScaleY;
-  const left=x-width/2,top=y-(FRONT.waterlineSourceY-crop.y)*imageScaleY;
-  ctx.save();ctx.filter='brightness(0) invert(0.72)';
-  for(const [clipY,clipHeight,alpha]of [[top,y-top,.78],[y,top+height-y,.24]]){
-   ctx.save();ctx.beginPath();ctx.rect(left,clipY,width,Math.max(0,clipHeight));ctx.clip();ctx.globalAlpha=alpha;
-   ctx.drawImage(yamatoFront,crop.x,crop.y,crop.width,crop.height,left,top,width,height);ctx.restore();
-  }
-  ctx.restore();return {mode:'front',ready:true,left,top,width,height,imageBottomY:top+height,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale};
+ const surface=globalThis.MKYamatoRotation?.surface(state.heading);
+ if(!surface)return {mode:'loading',ready:false,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale};
+ const nativeFactor=HULL_TO_MAP/2,left=x+surface.left*scale*nativeFactor,top=y-surface.top*scale*nativeFactor*SIDE_VERTICAL;
+ const width=surface.width*scale*nativeFactor,height=surface.height*scale*nativeFactor*SIDE_VERTICAL;
+ ctx.save();ctx.filter='brightness(0) invert(0.72)';
+ for(const [clipY,clipHeight,alpha]of [[top,y-top,.78],[y,top+height-y,.24]]){
+  ctx.save();ctx.beginPath();ctx.rect(left,clipY,width,Math.max(0,clipHeight));ctx.clip();ctx.globalAlpha=alpha;
+  ctx.drawImage(surface.canvas,left,top,width,height);ctx.restore();
  }
- if(state.heading===90&&yamatoSide.complete&&yamatoSide.naturalWidth){
-  const crop=HULL.crop,ppm=crop.width/HULL.lengthMeters;
-  const width=length,height=crop.height/ppm*verticalScale;
-  const left=x-width/2,top=y-(HULL.waterlineSourceY-crop.y)/ppm*verticalScale;
-  ctx.save();
-  for(const [clipY,clipHeight,alpha]of [[top,y-top,.85],[y,top+height-y,.24]]){
-   ctx.save();ctx.beginPath();ctx.rect(left,clipY,width,Math.max(0,clipHeight));ctx.clip();ctx.globalAlpha=alpha;
-   ctx.drawImage(yamatoSide,crop.x,crop.y,crop.width,crop.height,left,top,width,height);ctx.restore();
-  }
-  ctx.restore();return {mode:'side',ready:true,left,top,width,height,waterlineY:y,pixelsPerMapMeter:scale};
- }
- const profile=hullContact.projectProfile(state.heading);
- ctx.save();ctx.fillStyle='#8e969e';
- // Intersect front width at each height with the side roof and top footprint.
- // Fill all scanlines in one path so fractional rows do not compound opacity.
- for(const [above,alpha]of [[true,.50],[false,.18]]){
-  ctx.beginPath();for(const row of profile)if((row.height>=0)===above)ctx.rect(x+row.left*scale,y-(row.height+row.step/2)*scale*SIDE_VERTICAL,(row.right-row.left)*scale,row.step*scale*SIDE_VERTICAL);
-  ctx.globalAlpha=alpha;ctx.fill();
- }
- ctx.restore();
- const left=Math.min(...profile.map(r=>r.left)),right=Math.max(...profile.map(r=>r.right));
- return {mode:'schematic',ready:true,width:(right-left)*scale,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale,profileModel:'front-side-top intersection'};
+ ctx.restore();return {mode:'image-morph',ready:true,heading:state.heading,left,top,width,height,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale,frameCount:21};
 }
 function plot(canvas,delta,compact){
  const rect=canvas.getBoundingClientRect();if(!rect.width)return;
@@ -173,7 +148,7 @@ function plot(canvas,delta,compact){
  const r=current().result,contacts=r.contacts,ref=state.target,reach=contacts.at(-1).distanceMeters;
  const sceneWidth=compact?Math.min(...['early','reference','late'].map(id=>$(id).getBoundingClientRect().width)):w;
  const pad=compact?32:48,scenarios=compact?[-state.interval,0,state.interval]:[0];
- const heading=state.heading*Math.PI/180,hullHalf=HULL_TO_MAP*(263*Math.abs(Math.sin(heading))+38.9*Math.abs(Math.cos(heading)))/2;
+ const hullHalf=HULL_TO_MAP*263/2; // Keep the viewport scale fixed throughout rotation.
  const extent=(state.aim==='max'?contacts.at(-1).maxLengthMeters:contacts.at(-1).fullLengthMeters)/2;
  let min=Math.min(800+state.target-hullHalf,...scenarios.map(d=>800+state.offset+d));
  let max=Math.max(800+state.target+hullHalf,...scenarios.map(d=>800+state.offset+d+reach+extent));
@@ -192,7 +167,7 @@ function plot(canvas,delta,compact){
  let sideScale=Math.min(scale,(water-sideTop-26)/(Math.max(r.heightMeters,...allPoints.map(p=>p.y))*SIDE_VERTICAL),28/(FRONT.draftMeters*HULL_TO_MAP*SIDE_VERTICAL));
  if(sideDetail){
   const pixelsPerShipMeter=FRONT.crop.width/FRONT.beamMeters;
-   const frontAbove=Math.max((FRONT.waterlineSourceY-FRONT.crop.y)/pixelsPerShipMeter,...HULL.heights)*HULL_TO_MAP;
+   const frontAbove=96*HULL_TO_MAP/2;
   const offsets=state.view==='compare'?[-state.interval,0,state.interval]:[0];
   sideScale=Math.min((sceneWidth-pad*2)/1200,28/(FRONT.draftMeters*HULL_TO_MAP*SIDE_VERTICAL));
   // Fit visible heights using the SAME scale for ship and flight path in every scenario.
@@ -236,7 +211,7 @@ function plot(canvas,delta,compact){
  for(const p of displayBombs){dot(ctx,topX(origin+p.x),mid+p.z*topScale,p.hit?4.5:3.5,p.hit?'#ff963f':colors.pink)}
  ctx.restore();
  line(ctx,pad,sideTop-20,w-pad,sideTop-20);
- text(ctx,state.heading===0?'Side view · Yamato front':state.heading===180?'Side view · Yamato reference (180°)':state.heading===90?'Side view · Yamato broadside':'Side view · projected hull (schematic)',pad,sideTop,colors.text,compact?11:13);text(ctx,'Equal X/Y scale',w-pad,sideTop+15,colors.muted,10,'right');
+ text(ctx,state.heading===0?'Side view · Yamato front':state.heading===180?'Side view · Yamato stern':state.heading===90?'Side view · Yamato broadside':'Side view · Yamato',pad,sideTop,colors.text,compact?11:13);text(ctx,'Equal X/Y scale',w-pad,sideTop+15,colors.muted,10,'right');
  text(ctx,sideDetail?'Target area':'Entire run',pad,sideTop+16,colors.muted,10);
  ctx.save();ctx.beginPath();ctx.rect(pad,sideTop+22,w-pad*2,h-sideTop-56);ctx.clip();
  line(ctx,sideX(tx),sideTop+22,sideX(tx),water,colors.muted,1,[4,6]);
@@ -254,7 +229,7 @@ function plot(canvas,delta,compact){
 function drawAll(){
  if(!selectionConfigured)return;
  const compare=state.view==='compare';$('single').hidden=compare;$('comparison').hidden=!compare;$('plotTitle').textContent=compare?'Release timing':'Top view & bounce profile';
- $('offsetValue').textContent=`${state.offset>0?'+':''}${state.offset} m`;$('intervalValue').textContent=`${state.interval} m`;$('headingValue').textContent=`${state.heading}°`;
+ $('offsetValue').textContent=`${state.offset>0?'+':''}${state.offset} m`;$('intervalValue').textContent=`${state.interval} m`;$('headingValue').textContent=`${Number(state.heading.toFixed(1))}°`;
  $('clock').textContent=`${playbackTime().toFixed(2)} s`;
  if(embedded&&lastDurationReport!==duration()){lastDurationReport=duration();parent.postMessage({type:'skip-preview-duration',duration:lastDurationReport},location.origin)}
  const label=n=>`${n>0?'+':''}${fmt(n)} m from reference`;
@@ -263,7 +238,7 @@ function drawAll(){
  if(document.activeElement!==$('targetPosition'))$('targetPosition').value=Math.round(state.target);
  const alignment=current().result.contacts.find(c=>Math.abs(state.target-state.offset-c.distanceMeters)<.01);
  $('readout').innerHTML=`<p><span>Target position</span><strong>${fmt(state.target)} m</strong></p><p><span>Contact alignment</span><strong>${snapped?'C'+snapped.stage:alignment?'C'+alignment.stage:'—'}</strong></p><p><span>Target alignment offset</span><strong>${label(state.offset).split(' from')[0]}</strong></p><span class="note">Orange: approximate hull contact. Side-profile heights extended across the top-view hull. No armor or damage calculation.</span>`;
- $('caption').textContent='Pink: moving bomb · Orange: stopped hull contact · Illustrative dispersion, not hit probability · Native hull scale ×2 · Equal X/Y scale · Reference-image waterlines · Intermediate headings: projected silhouette';
+ $('caption').textContent='Pink: moving bomb · Orange: stopped hull contact · Illustrative dispersion, not hit probability · Native hull scale ×2 · Equal X/Y scale · Reference-image waterlines · Continuous Yamato rotation';
  if(embedded){
   const canvases=(compare?[$('early'),$('reference'),$('late')]:[$('linked')]).filter(c=>c.getBoundingClientRect().width>0);
   if(canvases.length){
@@ -300,10 +275,24 @@ for(const canvas of [$('linked'),$('early'),$('reference'),$('late')]){
  for(const event of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(drag?.canvas===canvas&&drag.id===e.pointerId)endDrag()});
  canvas.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home'].includes(e.key))return;e.preventDefault();snapped=null;state.target=e.key==='Home'?current().result.contacts[1].distanceMeters:state.target+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?50:10);state.center=state.target;schedule()});
 }
-for(const id of ['offset','interval','heading']){
+for(const id of ['offset','interval']){
  $(id).oninput=e=>{state[id]=Number(e.target.value);snapped=null;schedule()};
  $(id).ondblclick=e=>{e.target.value=e.target.defaultValue;state[id]=Number(e.target.value);snapped=null;schedule()};
 }
+function rotateHeading(value){
+ targetHeading=Math.max(0,Math.min(180,Number(value)||0));
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){cancelAnimationFrame(headingAnimation);headingAnimation=0;state.heading=targetHeading;schedule();return;}
+ if(headingAnimation)return;headingTime=performance.now();
+ const rotate=now=>{
+  const elapsed=Math.min(80,now-headingTime);headingTime=now;
+  state.heading+=(targetHeading-state.heading)*(1-Math.exp(-elapsed/35));
+  const finished=Math.abs(targetHeading-state.heading)<.02;if(finished)state.heading=targetHeading;
+  schedule();headingAnimation=finished?0:requestAnimationFrame(rotate);
+ };
+ headingAnimation=requestAnimationFrame(rotate);
+}
+$('heading').oninput=e=>rotateHeading(e.target.value);
+$('heading').ondblclick=e=>{e.target.value=e.target.defaultValue;rotateHeading(e.target.value)};
 for(const id of ['topRange','sideRange'])$(id).onchange=()=>{endDrag();schedule()};
 for(const id of ['bounds','loop'])$(id).onchange=schedule;
 for(const [id,key] of [['aim','aim'],['view','view']])$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;endDrag();state[key]=b.dataset[key];for(const s of $(id).children)s.setAttribute('aria-pressed',String(s===b));schedule()};
@@ -334,6 +323,7 @@ for(const id of ['time'])$(id).addEventListener('input',localPlayback,true);
 $('aim').addEventListener('click',localPlayback,true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.playing){cancelAnimationFrame(animation);state.playing=false;updatePlay()}});
 new ResizeObserver(schedule).observe($('single').parentElement);syncShip();
+globalThis.MKYamatoRotation?.prepare().then(ready=>{if(ready)schedule()});
 window.previewState=state;
 window.getSkipDuration=duration;
 window.newSkipSalvo=newSalvo;
@@ -361,10 +351,12 @@ window.setSkipSelection=(row,saved,theme)=>{
  selectionConfigured=true;
  window.pauseSkipPlayback();DATA.rows=[row];state.ship=0;
  bombCache.clear();contactSets.clear();contactKey='';
+ cancelAnimationFrame(headingAnimation);headingAnimation=0;
  const option=document.createElement('option');option.value='0';option.textContent=row.name;$('ship').replaceChildren(option);
  syncShip();
  if(embedded)document.querySelector('footer span').textContent='Experimental display-trajectory model using selected aircraft inputs. Game RNG, hit probability and damage are not reproduced. Native hull scale ×2.';
  if(saved){Object.assign(state,saved.state,{ship:0,playing:false});for(const [id,value]of Object.entries(saved.controls))if($(id).type==='checkbox')$(id).checked=value;else $(id).value=value}
+ targetHeading=state.heading;
  for(const id of ['offset','interval','heading'])$(id).value=state[id];
  for(const key of ['aim','view'])for(const button of $(key).children)button.setAttribute('aria-pressed',String(button.dataset[key]===state[key]));
  $('time').value=state.progress*1000;window.setSkipTheme(theme);schedule();
