@@ -51,9 +51,13 @@ views use consistent world-space bomb positions and contact timestamps.
 
 Orange markers stop at the earliest approximate hull contact. Misses continue.
 The top-view alpha silhouette supplies lateral bounds; the side image supplies
-fore/aft roof heights. These heights are extended across the top-view width,
-which can overestimate superstructure width and fills gaps and overhangs.
-This is a solid height envelope, not a 3D collision mesh. Thin rigging is excluded.
+fore/aft roof heights. The front image supplies transverse width at each height.
+Intermediate-angle drawing and above-water contact both intersect these three
+constraints. Upper structures no longer inherit the full hull beam at every
+height. The projection can widen with rotation because the ship's longitudinal
+extent becomes visible; it does not add arbitrary padding. Hidden geometry,
+gaps inside each silhouette row and overhangs remain approximate. This is not a
+3D collision mesh. Thin side-view rigging is excluded by the roof extraction.
 Trajectory segments near the hull are sampled at no more than 0.25 map meters
 and the first entry is refined by bisection; narrower features may be missed.
 
@@ -68,7 +72,7 @@ exaggeration has been removed from both the ship references and trajectories.
 At 90 degrees the supplied side image is shown; 0 degrees uses the
 front image. At 180 degrees the same front reference image is reused as a
 simplified end-on silhouette; it is not a separately captured stern image.
-Intermediate headings use a projected roof silhouette. Contact geometry still
+Intermediate headings use a projection of the combined silhouette constraints. Contact geometry still
 uses the selected heading, including the fore/aft reversal at 180 degrees.
 
 Changing target position, heading, dispersion or release offset updates contacts.

@@ -23,6 +23,10 @@ let browser;
   near(t.keelY,t.imageBottomY);
   await page.locator('#single').screenshot({path:path.join(artifacts,`skip-reference-${angle}-proportions.png`)});
  }
+ for(const angle of [1,179]){
+  const {target:t}=await heading(angle);assert.equal(t.mode,'schematic');assert.equal(t.profileModel,'front-side-top intersection');
+  await page.locator('#single').screenshot({path:path.join(artifacts,`skip-reference-${angle}-profile.png`)});
+ }
  const {target:s,exaggeration}=await heading(90);assert.equal(s.mode,'side');assert.equal(exaggeration,1);near(s.height/s.width,side.crop.height/side.crop.width);
  // A real moving bomb's vertical offset must use exactly the horizontal scale.
  await page.locator('#time').evaluate(e=>{e.value=400;e.dispatchEvent(new Event('input',{bubbles:true}))});await page.waitForTimeout(50);

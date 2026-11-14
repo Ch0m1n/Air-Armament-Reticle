@@ -72,7 +72,7 @@ const yamatoImage=new Image();yamatoImage.src=/*__YAMATO_IMAGE__*/null;yamatoIma
 const FRONT=/*__FRONT_REFERENCE__*/null,SIDE_VERTICAL=1;
 const yamatoFront=new Image();yamatoFront.src=/*__YAMATO_FRONT__*/null;yamatoFront.onload=()=>schedule();
 const HULL=/*__HULL_REFERENCE__*/null,createHullContact=/*__HULL_CONTACT__*/null;
-const hullContact=createHullContact(HULL,HULL_TO_MAP);
+const hullContact=createHullContact(HULL,HULL_TO_MAP,FRONT);
 const yamatoSide=new Image();yamatoSide.src=/*__YAMATO_SIDE__*/null;yamatoSide.onload=()=>schedule();
 const $ = id => document.getElementById(id);
 const state = {ship:0,aim:'full',view:'linked',target:0,center:0,progress:0,playing:false,offset:0,interval:250,heading:0,length:263,salvoSeed:11317};
@@ -155,21 +155,17 @@ function target(ctx,x,y,scale,side=false){
   }
   ctx.restore();return {mode:'side',ready:true,left,top,width,height,waterlineY:y,pixelsPerMapMeter:scale};
  }
- const angle=state.heading*Math.PI/180,projectedWidth=Math.abs(length*Math.sin(angle))+Math.abs(beam*Math.cos(angle));
- ctx.save();ctx.fillStyle='#8e969e';ctx.globalAlpha=.50;
- // Project the same roof envelope used for contact, retaining fore/aft heights.
- const roof=Array(161).fill(0),half=beam*Math.abs(Math.cos(angle))/2;
- for(let i=0;i<HULL.heights.length;i++){
-  const v=(.5-i/(HULL.heights.length-1))*263*HULL_TO_MAP,px=-v*Math.sin(angle)*scale;
-  const first=Math.max(0,Math.floor((px-half+projectedWidth/2)/projectedWidth*160));
-  const last=Math.min(160,Math.ceil((px+half+projectedWidth/2)/projectedWidth*160));
-  for(let j=first;j<=last;j++)roof[j]=Math.max(roof[j],HULL.heights[i]);
+ const profile=hullContact.projectProfile(state.heading);
+ ctx.save();ctx.fillStyle='#8e969e';
+ // Intersect front width at each height with the side roof and top footprint.
+ // Fill all scanlines in one path so fractional rows do not compound opacity.
+ for(const [above,alpha]of [[true,.50],[false,.18]]){
+  ctx.beginPath();for(const row of profile)if((row.height>=0)===above)ctx.rect(x+row.left*scale,y-(row.height+row.step/2)*scale*SIDE_VERTICAL,(row.right-row.left)*scale,row.step*scale*SIDE_VERTICAL);
+  ctx.globalAlpha=alpha;ctx.fill();
  }
- ctx.beginPath();ctx.moveTo(x-projectedWidth/2,y);
- roof.forEach((height,j)=>ctx.lineTo(x-projectedWidth/2+j/160*projectedWidth,y-height*verticalScale));
- ctx.lineTo(x+projectedWidth/2,y);ctx.closePath();ctx.fill();
- ctx.globalAlpha=.18;ctx.fillRect(x-projectedWidth/2,y,projectedWidth,keelY-y);ctx.restore();
- return {mode:'schematic',ready:!!yamatoFront.naturalWidth,width:projectedWidth,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale};
+ ctx.restore();
+ const left=Math.min(...profile.map(r=>r.left)),right=Math.max(...profile.map(r=>r.right));
+ return {mode:'schematic',ready:true,width:(right-left)*scale,waterlineY:y,keelY,deckY,pixelsPerMapMeter:scale,profileModel:'front-side-top intersection'};
 }
 function plot(canvas,delta,compact){
  const rect=canvas.getBoundingClientRect();if(!rect.width)return;

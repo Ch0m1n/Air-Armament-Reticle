@@ -1,5 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
+const {createHullContact}=require('../src/skip-bombers/hull-contact.cjs');
 const {reconstructSkip}=require('../src/skip-bombers/reconstruct.cjs');
 const golden=require('../src/skip-bombers/data.json').rows[0];
 const plane={name:'Any_Selected_Aircraft',aimingHeight:6,speedMoveWithBomb:123,attackerSize:2,projectilesPerAttack:2,attackCount:1,outerSalvoSize:[3,2.2],minSpread:[1,1],maxSpread:[2.5,2.5]};
@@ -21,4 +22,18 @@ test('selection changes affect geometry without a ship-name whitelist or fallbac
  assert.throws(()=>reconstructSkip(plane,{...weapon,skips:null}),/unavailable/);
  assert.throws(()=>reconstructSkip({...plane,aimingHeight:0},weapon),/invalid/);
  assert.equal(JSON.stringify([plane,weapon]),original);
+});
+test('upper structures use the narrow front silhouette for drawing and contact',()=>{
+ const reference={lengthMeters:10,beamMeters:4,heights:[3,3,3],widths:[[-.5,.5],[-.5,.5],[-.5,.5]]};
+ const front={beamMeters:4,crop:{x:0,y:0,width:4,height:5},waterlineSourceY:3,widths:[[-.125,.125],[-.125,.125],[-.5,.5],[-.5,.5],[-.5,.5]]};
+ const hull=createHullContact(reference,1,front);
+ assert.equal(hull.contains(1.5,2.5,0,0,0),false,'Upper structure must not fill the whole beam');
+ assert.equal(hull.contains(0,2.5,0,0,0),true);
+ assert.equal(hull.contains(1.5,.5,0,0,0),true,'Lower hull keeps its full width');
+ const profile=hull.projectProfile(0);
+ assert.equal(profile.find(r=>r.height===2.5).right-profile.find(r=>r.height===2.5).left,1);
+ assert.equal(profile.find(r=>r.height===.5).right-profile.find(r=>r.height===.5).left,4);
+ const hit=hull.firstContact([{x:-3,y:2.5,z:0,t:0},{x:3,y:2.5,z:0,t:6}],0,0);
+ assert.ok(Math.abs(hit.x+.5)<1e-5,'Contact occurs at the narrow structure, not the full-beam box');
+ assert.equal(hull.projectProfile(90).find(r=>r.height===2.5).right-hull.projectProfile(90).find(r=>r.height===2.5).left,10);
 });
