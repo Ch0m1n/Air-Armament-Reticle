@@ -15,9 +15,9 @@ export function writeFixtureDataset(root,game='KORABLI',version='fixture-A',incl
     ShipUpgradeInfo:{TEST_TB_STOCK:{components:{torpedoBomber:['A1_TorpedoBomber']},prev:''},TEST_TB_TOP:{components:{torpedoBomber:['A2_TorpedoBomber']},prev:'TEST_TB_STOCK'}}};
   const projectiles=[{name:'TEST_BOMB',typeinfo:{type:'Projectile'},ammoType:'HE',withParachute:true,fallTime:2},{name:'TEST_TORPEDO',typeinfo:{type:'Projectile'},ammoType:'torpedo',speed:20,armingTime:2,maxDist:100}];
   const attack={...aircraft,name:'TEST_ATTACK',bombName:'TEST_ROCKET'};
-  const skip={name:'TEST_SKIP',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB'};
+  const skip={...aircraft,name:'TEST_SKIP',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB',aimingHeight:6};
   if(includeAttack){ship.A_AttackAircraft={planes:[attack.name]};projectiles.push({name:'TEST_ROCKET',typeinfo:{type:'Projectile',species:'Rocket'},ammoType:'HE',planeAmmoType:'rocket'});}
-  if(includeSkip){ship.A_SkipBomber={planes:[skip.name]};projectiles.push({name:'TEST_SKIP_BOMB',typeinfo:{type:'Projectile',species:'SkipBomb'},ammoType:'HE',planeAmmoType:'skip'});}
+  if(includeSkip){ship.A_SkipBomber={planes:[skip.name]};projectiles.push({name:'TEST_SKIP_BOMB',typeinfo:{type:'Projectile',species:'SkipBomb'},ammoType:'HE',planeAmmoType:'skip',projectileVelocityBoost:[1,1],fallingTimeCoef:1,maxSkipAngle:20,skips:[[1,1,.9,1.2,.6]]});}
   const write=(folder,value)=>fs.writeFileSync(path.join(base,folder,value.name+'.json'),JSON.stringify(value)+'\n');
   write('Ships',ship);for(const plane of [bomb,torpedo,researched,airstrike])write('Aircraft',plane);for(const weapon of projectiles)write('Projectiles',weapon);
   if(includeAttack){

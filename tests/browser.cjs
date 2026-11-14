@@ -24,13 +24,11 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await page.evaluate(()=>{selections.push({id:9999,kind:'skip'});renderComparison();});
     for(const kind of ['skip']){
       await page.locator('#comparison-tab-'+kind).click();
-      const panel=page.locator('#comparison-'+kind);assert((await panel.innerText()).includes('Under the Maintenance!'));
-      assert(await panel.locator('img').evaluate(image=>image.complete&&image.naturalWidth>0));
-      assert((await panel.locator('img').getAttribute('src')).includes('maintenance-'));
+      const panel=page.locator('#comparison-'+kind);assert((await panel.innerText()).includes('Selected aircraft data is unavailable'));
+      assert.equal(await panel.locator('.maintenance-state').count(),0);
     }
     await page.screenshot({path:path.join(artifacts,'maintenance-light.png'),fullPage:true});
-    const animation=page.locator('#comparison-skip .maintenance-state img');
-    const frame=await animation.screenshot();await new Promise(resolve=>setTimeout(resolve,350));assert(!frame.equals(await animation.screenshot()));
+    const animation=page.locator('#comparison-skip article');
     await page.setViewportSize({width:390,height:844});await animation.scrollIntoViewIfNeeded();
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await page.screenshot({path:path.join(artifacts,'maintenance-mobile.png')});
@@ -240,8 +238,9 @@ const root=path.resolve(__dirname,'..'),artifacts=path.join(root,'test-artifacts
     await first.locator('[data-field="role"]').selectOption('skip');await page.waitForFunction(()=>!busy);
     await first.locator('[data-field="entryId"]').selectOption({label:'TEST_SKIP'});await page.waitForFunction(()=>!busy);
     await page.locator('#comparison-tab-skip').click();
-    assert.equal(await page.locator('#comparison-skip article').count(),0);
-    assert((await page.locator('#comparison-skip').innerText()).includes('Under the Maintenance!'));
+    assert.equal(await page.locator('#comparison-skip article').count(),1);
+    await page.locator('#comparison-skip iframe').waitFor({state:'visible'});
+    assert.equal(await page.locator('#comparison-skip .maintenance-state').count(),0);
     assert(await page.evaluate(()=>selections.some(r=>r.kind==='skip'&&!r.outer&&r.geometrySupported===false)));
     await page.locator('#share').click();const skipLink=await page.evaluate(()=>navigator.clipboard.readText());
     await page.goto(skipLink);await page.waitForFunction(()=>!busy);

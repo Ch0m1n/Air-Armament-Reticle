@@ -1,9 +1,13 @@
 # Skip-bomber trajectory preview
 
-This experimental page reconstructs Korabli skip-bomber display trajectories
-for baseline Béarn, Max Immelmann and Admiral Nakhimov aircraft. Baseline inputs
-and visual trajectory helpers were checked against the 26.11.1 client. It is
-not an in-game capture, a hit-probability calculator, or an armor/damage model.
+The existing site's Skip bombers comparison tab reconstructs trajectories from
+each selected aircraft and matching projectile. Each selected ship has its own
+embedded controls; the ship/module selection is made in the existing editors.
+Korabli baseline inputs and visual trajectory helpers were checked against the
+26.11.1 client. WoWS uses the Korabli trajectory model as a labeled estimate;
+its game-specific display helpers have not been independently verified. Legacy
+`skips` and ordered `SkipsSequence` inputs are supported. This is not an in-game
+capture, a hit-probability calculator, or an armor/damage model.
 
 ## Dispersion and playback
 

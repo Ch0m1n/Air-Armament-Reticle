@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {buildSkipBombers} from './build-skip-bombers.mjs';
+import {createRequire} from 'node:module';
+const {reconstructSkip}=createRequire(import.meta.url)('../src/skip-bombers/reconstruct.cjs');
 const root=path.resolve(import.meta.dirname,'..');
 const source=fs.readFileSync(path.join(root,'src/viewer-source.html'),'utf8');
 let engine=source.match(/<script>([\s\S]*?)<\/script>/)[1].split('// UI')[0];
@@ -18,11 +20,12 @@ fs.mkdirSync(path.join(out,'assets'),{recursive:true});
 fs.writeFileSync(path.join(out,'assets/yamato.png'),Buffer.from(image[1],'base64'));
 fs.copyFileSync(path.join(root,'src/vendor/lucide-LICENSE'),path.join(out,'assets/lucide-LICENSE.txt'));
 const assets={};
+const skipVersion=buildSkipBombers(root,out,'data:image/png;base64,'+image[1]);
 const maintenance=fs.readFileSync(path.join(root,'src/assets/maintenance.webp'));
 assets.maintenance='maintenance-'+crypto.createHash('sha256').update(maintenance).digest('hex').slice(0,12)+'.webp';
 fs.writeFileSync(path.join(out,'assets',assets.maintenance),maintenance);
 for(const [name,text]of Object.entries({'viewer.js':engine,'icons.js':'globalThis.RETICLE_ICONS='+fs.readFileSync(path.join(root,'src/vendor/icons.json'),'utf8')+';','site.css':fs.readFileSync(path.join(root,'src/site.css'),'utf8'),'site.js':fs.readFileSync(path.join(root,'src/site.js'),'utf8')})) {
-  const bundled=name==='site.js'?fs.readFileSync(path.join(root,'src/modifiers.js'),'utf8')+'\n'+text.replaceAll('{{maintenance}}',assets.maintenance):text;
+  const bundled=name==='site.js'?'const reconstructSkip='+reconstructSkip.toString()+';\n'+fs.readFileSync(path.join(root,'src/modifiers.js'),'utf8')+'\n'+text.replaceAll('{{maintenance}}',assets.maintenance).replaceAll('{{skipVersion}}',skipVersion):text;
   const hash=crypto.createHash('sha256').update(bundled).digest('hex').slice(0,12);
   const filename=name.replace('.',`-${hash}.`);assets[name]=filename;fs.writeFileSync(path.join(out,'assets',filename),bundled);
 }
@@ -39,6 +42,5 @@ for(const dataset of JSON.parse(catalog).datasets) {
 let html=fs.readFileSync(path.join(root,'src/shell.html'),'utf8');
 for(const [name,filename]of Object.entries(assets))html=html.replaceAll('{{'+name+'}}',filename);
 fs.writeFileSync(path.join(out,'index.html'),html);
-buildSkipBombers(root,out,'data:image/png;base64,'+image[1]);
 fs.writeFileSync(path.join(out,'.nojekyll'),'');
 console.log('Built static site in dist/');

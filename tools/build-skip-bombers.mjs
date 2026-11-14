@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 const {buildSalvo}=require('../src/skip-bombers/salvo-model.cjs');
@@ -20,4 +21,5 @@ export function buildSkipBombers(root,out,topImage){
  fs.mkdirSync(path.join(destination,'research'),{recursive:true});
  fs.writeFileSync(path.join(destination,'index.html'),html);
  fs.copyFileSync(path.join(source,'NOTES.md'),path.join(destination,'research/FINDINGS.md'));
+ return crypto.createHash('sha256').update(html).digest('hex').slice(0,12);
 }

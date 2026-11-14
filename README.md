@@ -4,14 +4,16 @@ A static comparison tool for aircraft weapon aiming areas inspired by jcw780's w
 
 ## https://ch0m1n.github.io/Air-Armament-Reticle/
 
-Standalone skip-bomber research preview: https://ch0m1n.github.io/Air-Armament-Reticle/skip-bombers/
-
-The separate preview includes Béarn, Max Immelmann and Admiral Nakhimov,
-linked top/side playback, new salvo sampling, shared-sample release timing
-comparisons, and approximate Yamato hull contacts. It is built from
-`src/skip-bombers/` by `tools/build-skip-bombers.mjs`; see that folder's
-`NOTES.md` for limitations. This does not enable skip geometry in the main
-multi-ship comparison workspace.
+Select skip-bomber aircraft in the existing ship editors, then open the
+**Skip bombers** comparison tab. Each selected aircraft has linked top/side
+playback, new salvo sampling, shared-sample release timing comparisons and
+approximate Yamato hull contacts directly in the comparison workspace.
+Changing the selected aircraft or module updates its trajectory inputs. Tab
+switching retains each aircraft's current sample and paused playback position.
+Both legacy `skips` rows and ordered `SkipsSequence` data are supported. WoWS
+uses the Korabli display-trajectory model as an explicitly labeled estimate.
+The embedded renderer is built from `src/skip-bombers/` by
+`tools/build-skip-bombers.mjs`; see that folder's `NOTES.md` for limitations.
 
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
@@ -48,7 +50,7 @@ The importer accepts singular `Ship`/`Projectile` source folders as well as plur
 - Light mode is the default; the header theme control switches to dark mode and remembers the preference locally.
 - **Add Ship** creates independent editors (up to 12), each with version, nation, type, ship, armament, research module and aircraft selectors.
 - Editable ship labels, clone/remove controls and per-editor Modifiers support variant comparisons. Original values and help tooltips are provided; reset restores original inputs.
-- Results have separate bomber, torpedo bomber and airstrike tabs. Attack aircraft and skip-bomber tabs are reserved; their geometry is not implemented.
+- Results have separate bomber, torpedo bomber, airstrike, experimental attack-aircraft and skip-bomber tabs. Skip bombers render selected-aircraft trajectories and playback controls directly in the comparison workspace.
 - Reserved tabs display the provided animated maintenance WebP in place of results; the original animation is preserved.
 - Card/list comparison layouts, same scale within each armament type, Yamato reference, illustrative airstrike drops, share links, JSON import and result export are included.
 - Overrides do not mutate repository data. Edits persist in clones and shared links. Uploaded results can be exported, not shared as repository links.

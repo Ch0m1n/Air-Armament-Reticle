@@ -15,6 +15,11 @@ canvas{height:530px}
 <style>
 .playbar{grid-template-columns:auto 40px 40px minmax(0,1fr) 90px}
 @media(max-width:500px){.playbar{grid-template-columns:40px 40px minmax(0,1fr) 65px}#newSalvo{grid-column:1/-1;justify-self:start}}
+html[data-embedded="true"] header,html[data-embedded="true"] .toolbar>label:first-child{display:none}
+html[data-embedded="true"] main{padding:12px 16px;max-width:none}
+html[data-theme="light"]{color-scheme:light;--bg:#fff;--line:#cdd5d2;--text:#202724;--muted:#5b6b63;--cyan:#127456}
+html[data-theme="light"] button,html[data-theme="light"] select,html[data-theme="light"] #targetPosition{background:#fff!important;color:#202724!important;border-color:#cdd5d2!important}
+html[data-theme="light"] button[aria-pressed="true"]{background:#deeee5!important;color:#13523a!important}
 </style>
 <header><h1>Skip bombers <span>Research preview</span></h1><a href="../">Air Armament Reticle</a></header>
 <main>
@@ -71,6 +76,8 @@ const hullContact=createHullContact(HULL,HULL_TO_MAP);
 const yamatoSide=new Image();yamatoSide.src=/*__YAMATO_SIDE__*/null;yamatoSide.onload=()=>schedule();
 const $ = id => document.getElementById(id);
 const state = {ship:0,aim:'full',view:'linked',target:0,center:0,progress:0,playing:false,offset:0,interval:250,heading:0,length:263,salvoSeed:11317};
+const embedded=new URLSearchParams(location.search).has('embedded');
+document.documentElement.dataset.embedded=String(embedded);
 const plotGeometry=new Map();let drag=null,snapped=null;
 const colors={line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'};
 const fmt=n=>Math.round(n).toLocaleString('en-US');
@@ -81,7 +88,8 @@ function syncShip(){
  const row=current(),r=row.result;
  state.target=r.contacts[1].distanceMeters;state.center=state.target;snapped=null;
  $('targetPosition').value=Math.round(state.target);
- $('facts').innerHTML=`<span><strong>${row.name}</strong></span><span>Aircraft: <strong>${r.speedKn} kn</strong></span><span>Release height: <strong>${fmt(r.heightMeters)} m</strong></span><span>Attack group: <strong>${row.bombs} bombs</strong></span><span><strong>${r.contacts.length} contact lines</strong></span><span>${row.id==='Nakhimov'?'Top aircraft module':'Baseline aircraft module'}</span>`;
+ const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ $('facts').innerHTML=`<span><strong>${safe(row.name)}</strong></span><span>Aircraft: <strong>${r.speedKn} kn</strong></span><span>Release height: <strong>${fmt(r.heightMeters)} m</strong></span><span>Attack group: <strong>${row.bombs} bombs</strong></span><span><strong>${r.contacts.length} contact lines</strong></span><span>${safe(row.note||(row.id==='Nakhimov'?'Top aircraft module':'Baseline aircraft module'))}</span>`;
  $('rows').innerHTML=r.contacts.map(c=>`<tr><td>C${c.stage}${c.stage===0?' · first contact':''}</td><td>${c.distanceMeters.toFixed(1)} m</td><td>${c.fullWidthMeters.toFixed(1)} m</td><td>${c.maxWidthMeters.toFixed(1)} m</td><td>${c.fullLengthMeters.toFixed(1)} m</td></tr>`).join('');
  state.progress=0;$('time').value=0;schedule();
 }
@@ -300,6 +308,24 @@ $('time').oninput=e=>{state.progress=Number(e.target.value)/1000;schedule()};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.playing){cancelAnimationFrame(animation);state.playing=false;updatePlay()}});
 new ResizeObserver(schedule).observe($('single').parentElement);syncShip();
 window.previewState=state;
+window.pauseSkipPlayback=()=>{cancelAnimationFrame(animation);state.playing=false;updatePlay()};
+window.exportSkipState=()=>({state:{...state,playing:false},controls:Object.fromEntries(['topRange','sideRange','bounds','loop'].map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]))});
+window.setSkipTheme=theme=>{
+ document.documentElement.dataset.theme=theme;
+ Object.assign(colors,theme==='light'?{line:'#cdd5d2',muted:'#5b6b63',text:'#202724',gold:'#9a6100',cyan:'#127456',pink:'#a73c62'}:{line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'});schedule();
+};
+window.setSkipSelection=(row,saved,theme)=>{
+ window.pauseSkipPlayback();DATA.rows=[row];state.ship=0;
+ bombCache.clear();contactSets.clear();contactKey='';
+ const option=document.createElement('option');option.value='0';option.textContent=row.name;$('ship').replaceChildren(option);
+ syncShip();
+ if(embedded)document.querySelector('footer span').textContent='Experimental display-trajectory model using selected aircraft inputs. Game RNG, hit probability and damage are not reproduced. Native hull scale ×2.';
+ if(saved){Object.assign(state,saved.state,{ship:0,playing:false});for(const [id,value]of Object.entries(saved.controls))if($(id).type==='checkbox')$(id).checked=value;else $(id).value=value}
+ for(const id of ['offset','interval','heading'])$(id).value=state[id];
+ for(const key of ['aim','view'])for(const button of $(key).children)button.setAttribute('aria-pressed',String(button.dataset[key]===state[key]));
+ $('time').value=state.progress*1000;window.setSkipTheme(theme);schedule();
+};
+if(embedded)new ResizeObserver(()=>parent.postMessage({type:'skip-preview-height',height:Math.ceil(document.body.getBoundingClientRect().height)+2},location.origin)).observe(document.body);
 }
 </script>
 </html>
