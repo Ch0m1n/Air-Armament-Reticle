@@ -77,6 +77,7 @@ const yamatoSide=new Image();yamatoSide.src=/*__YAMATO_SIDE__*/null;yamatoSide.o
 const $ = id => document.getElementById(id);
 const state = {ship:0,aim:'full',view:'linked',target:0,center:0,progress:0,playing:false,offset:0,interval:250,heading:0,length:263,salvoSeed:11317};
 const embedded=new URLSearchParams(location.search).has('embedded');
+let sharedScaleSettings=null,sharedScaleEnabled=false,lastScaleReport='';
 document.documentElement.dataset.embedded=String(embedded);
 const plotGeometry=new Map();let drag=null,snapped=null;
 const colors={line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'};
@@ -203,14 +204,20 @@ function plot(canvas,delta,compact){
    sideScale=Math.min(sideScale,(water-sideTop-26)/(highest*SIDE_VERTICAL));
   }
  }
- if(drag&&plotGeometry.has(canvas))sideScale=plotGeometry.get(canvas).side.scale;
+ if(sharedScaleEnabled)sideScale=Math.min(sideScale,(water-sideTop-26)/(Math.max(r.heightMeters,...HULL.heights.map(h=>h*HULL_TO_MAP),...allPoints.map(p=>p.y))*SIDE_VERTICAL));
+ if(drag&&plotGeometry.has(canvas))sideScale=plotGeometry.get(canvas).side.requestedScale;
+ const requestedSideScale=sideScale;
+ if(sharedScaleSettings)sideScale=Math.min(sideScale,sharedScaleSettings.side);
  const sideX=m=>w/2+(m-(sideDetail?center:(min+max)/2))*sideScale,heightScale=sideScale;
  canvas.dataset.sidePixelsPerMapMeter=sideScale;canvas.dataset.sideRange=sideDetail?'detail':'all';canvas.dataset.sideVerticalExaggeration=SIDE_VERTICAL;
  const widthBound=Math.max(...contacts.map(c=>c.maxWidthMeters),263*HULL_TO_MAP),detail=$('topRange').value==='detail';
- const topScale=Math.min(detail?(sceneWidth-pad*2)/1500:scale,108/(widthBound/2));
+ let topScale=Math.min(detail?(sceneWidth-pad*2)/1500:scale,108/(widthBound/2));
+ const requestedTopScale=topScale;
+ if(sharedScaleSettings)topScale=Math.min(topScale,sharedScaleSettings.top);
+ canvas.dataset.requestedTopScale=requestedTopScale;canvas.dataset.requestedSideScale=requestedSideScale;canvas.dataset.sharedScale=sharedScaleEnabled;
  canvas.dataset.hullToMapScale=HULL_TO_MAP;canvas.dataset.yamatoLengthPixels=263*HULL_TO_MAP*topScale;canvas.dataset.topPixelsPerMapMeter=topScale;
  const topX=m=>w/2+(m-(detail?center:(min+max)/2))*topScale,topMin=center-(w/2-pad)/topScale,topMax=center+(w/2-pad)/topScale;
- plotGeometry.set(canvas,{pad,w,mid,water,min,max,top:{scale:topScale,zero:topX(800),min:topY,max:mid+95},side:{scale:sideScale,zero:sideX(800),min:sideTop+22,max:water+28},delta});
+ plotGeometry.set(canvas,{pad,w,mid,water,min,max,top:{scale:topScale,zero:topX(800),min:topY,max:mid+95},side:{scale:sideScale,requestedScale:requestedSideScale,zero:sideX(800),min:sideTop+22,max:water+28},delta});
  canvas.dataset.targetPosition=state.target;canvas.dataset.targetTopX=topX(tx);canvas.dataset.targetSideX=sideX(tx);canvas.dataset.targetTopY=mid;
  const tickStep=Math.ceil(75/topScale/250)*250;
  for(let k=Math.ceil(((detail?topMin:min)-center)/250);center+k*250<=(detail?topMax:max);k++){const m=center+k*250;line(ctx,topX(m),topY,topX(m),mid+95,'#32363c');if(k%(tickStep/250)===0)text(ctx,`${fmt(m-800)} m`,topX(m),mid+116,colors.muted,compact?10:11,'center')}
@@ -256,6 +263,13 @@ function drawAll(){
  const alignment=current().result.contacts.find(c=>Math.abs(state.target-state.offset-c.distanceMeters)<.01);
  $('readout').innerHTML=`<p><span>Target position</span><strong>${fmt(state.target)} m</strong></p><p><span>Contact alignment</span><strong>${snapped?'C'+snapped.stage:alignment?'C'+alignment.stage:'—'}</strong></p><p><span>Target alignment offset</span><strong>${label(state.offset).split(' from')[0]}</strong></p><span class="note">Orange: approximate hull contact. Side-profile heights extended across the top-view hull. No armor or damage calculation.</span>`;
  $('caption').textContent='Pink: moving bomb · Orange: stopped hull contact · Illustrative dispersion, not hit probability · Native hull scale ×2 · Height ×2 · Estimated waterlines · Intermediate headings: projected silhouette';
+ if(embedded){
+  const canvases=(compare?[$('early'),$('reference'),$('late')]:[$('linked')]).filter(c=>c.getBoundingClientRect().width>0);
+  if(canvases.length){
+   const scales={top:Math.min(...canvases.map(c=>Number(c.dataset.requestedTopScale))),side:Math.min(...canvases.map(c=>Number(c.dataset.requestedSideScale)))};
+   const report=JSON.stringify(scales);if(report!==lastScaleReport){lastScaleReport=report;parent.postMessage({type:'skip-preview-scale',scales},location.origin)}
+  }
+ }
 }
 $('ship').innerHTML=DATA.rows.map((r,i)=>`<option value="${i}">${r.name}</option>`).join('');
 $('ship').onchange=e=>{endDrag();state.ship=Number(e.target.value);syncShip()};
@@ -308,6 +322,12 @@ $('time').oninput=e=>{state.progress=Number(e.target.value)/1000;schedule()};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.playing){cancelAnimationFrame(animation);state.playing=false;updatePlay()}});
 new ResizeObserver(schedule).observe($('single').parentElement);syncShip();
 window.previewState=state;
+window.setSkipSharedScale=settings=>{
+ const enabled=settings!==null;
+ const value=settings&&Number.isFinite(settings.top)&&Number.isFinite(settings.side)&&settings.top>0&&settings.side>0?settings:null;
+ if(enabled===sharedScaleEnabled&&JSON.stringify(value)===JSON.stringify(sharedScaleSettings))return;
+ sharedScaleEnabled=enabled;sharedScaleSettings=value;schedule();
+};
 window.pauseSkipPlayback=()=>{cancelAnimationFrame(animation);state.playing=false;updatePlay()};
 window.exportSkipState=()=>({state:{...state,playing:false},controls:Object.fromEntries(['topRange','sideRange','bounds','loop'].map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]))});
 window.setSkipTheme=theme=>{

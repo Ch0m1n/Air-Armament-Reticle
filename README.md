@@ -10,6 +10,11 @@ playback, new salvo sampling, shared-sample release timing comparisons and
 approximate Yamato hull contacts directly in the comparison workspace.
 Changing the selected aircraft or module updates its trajectory inputs. Tab
 switching retains each aircraft's current sample and paused playback position.
+Card/list controls also apply to skip bombers. Same scale matches pixels per
+map meter across all selected ships, separately for top and side views (side
+height keeps its x2 exaggeration), including release-timing comparisons.
+Turn it off for independent automatic fitting. Layout and scale changes retain
+each aircraft's current sample and playback position.
 Both legacy `skips` rows and ordered `SkipsSequence` data are supported. WoWS
 uses the Korabli display-trajectory model as an explicitly labeled estimate.
 The embedded renderer is built from `src/skip-bombers/` by

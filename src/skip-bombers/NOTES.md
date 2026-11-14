@@ -11,6 +11,15 @@ capture, a hit-probability calculator, or an armor/damage model.
 
 ## Dispersion and playback
 
+The site's card/list controls arrange multiple selected ships side by side or
+in full-width rows. Same scale selects a common pixels-per-map-meter ratio
+across all visible ship plots, separately for top and side views. Side-view
+height retains its additional x2 exaggeration. The smallest independently
+requested scale is used to fit every selected plot, including timing scenarios;
+scales are recomputed after viewport and display-range changes. Turn Same scale
+off to fit each ship independently. Layout and scale changes preserve samples,
+controls and paused playback positions.
+
 New salvo generates a new illustrative sample and resets the playback position.
 Press Play to view it. Reset, replay and loops retain that sample. All three
 release-timing comparisons use the same sample with different release origins.

@@ -6,6 +6,13 @@ const comparisonOrder=['attack','bomb','torpedo','skip','airstrike'];
 const comparisonKinds=()=>comparisonOrder.filter(kind=>selections.some(item=>item.kind===kind));
 const supportedRoles=new Set(['bomb','torpedo','airstrike','attack']);
 const skipSessions=new Map();
+const skipScaleRequests=new Map();
+function updateSkipSharedScale(){
+  const frames=[...document.querySelectorAll('iframe[data-skip-id]')];
+  const requests=frames.map(f=>skipScaleRequests.get(Number(f.dataset.skipId))).filter(Boolean);
+  const settings=sharedScale?requests.length?{top:Math.min(...requests.map(r=>r.top)),side:Math.min(...requests.map(r=>r.side))}:{}:null;
+  for(const frame of frames)frame.contentWindow.setSkipSharedScale?.(settings);
+}
 function saveSkipSessions(){
   for(const frame of document.querySelectorAll('iframe[data-skip-id]')){
     const session=skipSessions.get(Number(frame.dataset.skipId));
@@ -26,17 +33,28 @@ function skipCard(item){
   return `<article class="reticle-card skip-card" data-id="${item.id}"><div class="card-heading"><div><span class="card-role">Skip bombers</span><h3>${escapeHtml(item.shipLabel||item.name)}</h3><p class="aircraft-id">${escapeHtml(item.name)}</p></div><button type="button" class="icon-button" data-action="remove" data-id="${item.id}" title="Remove ship" aria-label="Remove ${escapeHtml(item.shipLabel||item.name)}">${glyph('X')}</button></div><iframe class="skip-workspace" data-skip-id="${item.id}" title="${escapeHtml(item.shipLabel||item.name)} skip-bomber simulation" src="./skip-bombers/?embedded=1&amp;v={{skipVersion}}" style="visibility:hidden"></iframe><details class="source-data"><summary>Source data</summary>${sourceData(item)}</details></article>`;
 }
 function mountSkipFrames(){
+  skipScaleRequests.clear();
   for(const frame of document.querySelectorAll('iframe[data-skip-id]'))frame.addEventListener('load',()=>{
     const session=skipSessions.get(Number(frame.dataset.skipId));if(!session)return;
     frame.contentWindow.setSkipSelection(session.row,session.saved,document.documentElement.dataset.theme||'light');
+    frame.contentWindow.setSkipSharedScale(sharedScale?{}:null);
     frame.style.visibility='visible';
     if(comparisonRole!=='skip')frame.contentWindow.pauseSkipPlayback();
   },{once:true});
   for(const id of skipSessions.keys())if(!selections.some(item=>item.id===id))skipSessions.delete(id);
 }
 window.addEventListener('message',event=>{
-  if(event.origin!==location.origin||event.data?.type!=='skip-preview-height')return;
+  if(event.origin!==location.origin)return;
   const frame=Array.from(document.querySelectorAll('iframe[data-skip-id]')).find(f=>f.contentWindow===event.source);
+  if(!frame)return;
+  if(event.data?.type==='skip-preview-scale'){
+    const scales=event.data.scales;
+    if(scales&&[scales.top,scales.side].every(n=>Number.isFinite(n)&&n>0)){
+      skipScaleRequests.set(Number(frame.dataset.skipId),scales);updateSkipSharedScale();
+    }
+    return;
+  }
+  if(event.data?.type!=='skip-preview-height')return;
   if(frame&&Number.isFinite(event.data.height))frame.style.height=Math.min(10000,Math.max(400,event.data.height))+'px';
 });
 let catalog=null,busy=false,nextSelection=1,cardView=true,sharedScale=true;
@@ -187,12 +205,12 @@ function renderComparison(focus=null) {
   ui('results').className='comparison-groups';
   renderComparisonTabs();
   ui('comparison-count').textContent=selections.length;
-  ui('comparison-subtitle').textContent=!kinds.length?'No aircraft selected':comparisonRole==='skip'?'Skip-bomber trajectories · Selected aircraft · Experimental hull contacts':!supportedRoles.has(comparisonRole)?'Under the Maintenance!':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
+  ui('comparison-subtitle').textContent=!kinds.length?'No aircraft selected':comparisonRole==='skip'?(sharedScale?'Shared scale':'Independent scales')+' · Skip-bomber trajectories · Experimental hull contacts':!supportedRoles.has(comparisonRole)?'Under the Maintenance!':sharedScale?'Shared scale within '+roleNames[comparisonRole]:'Independent scales';
   ui('cards-view').setAttribute('aria-pressed',String(cardView));ui('list-view').setAttribute('aria-pressed',String(!cardView));
-  for(const id of ['shared-scale','cards-view','list-view'])ui(id).disabled=comparisonRole==='skip';
+  for(const id of ['shared-scale','cards-view','list-view'])ui(id).disabled=false;
   ui('results').innerHTML=kinds.map(kind=>{
     const label=roleNames[kind];
-    if(kind==='skip')return `<section id="comparison-skip" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-skip" data-comparison-role="skip"${kind===comparisonRole?'':' hidden'}><div class="skip-comparison">${selections.filter(item=>item.kind==='skip').map(skipCard).join('')}</div></section>`;
+    if(kind==='skip')return `<section id="comparison-skip" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-skip" data-comparison-role="skip"${kind===comparisonRole?'':' hidden'}><div class="skip-comparison ${cardView?'comparison-cards':'comparison-list'}">${selections.filter(item=>item.kind==='skip').map(skipCard).join('')}</div></section>`;
     const members=supportedRoles.has(kind)?selections.filter(item=>item.kind===kind):[];
     const distanceLimit=torpedoDistanceLimit();
     const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members,distanceLimit);
