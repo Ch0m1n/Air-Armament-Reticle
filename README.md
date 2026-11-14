@@ -11,8 +11,8 @@ approximate Yamato hull contacts directly in the comparison workspace.
 Changing the selected aircraft or module updates its trajectory inputs. Tab
 switching retains each aircraft's current sample and paused playback position.
 Card/list controls also apply to skip bombers. Same scale matches pixels per
-map meter across all selected ships, separately for top and side views (side
-height keeps its x2 exaggeration), including release-timing comparisons.
+map meter across all selected ships, separately for top and side views, with
+equal horizontal and vertical units, including release-timing comparisons.
 Turn it off for independent automatic fitting. Layout and scale changes retain
 each aircraft's current sample and playback position.
 Use **Play all**, **Pause all**, **Reset all** and the shared time slider to

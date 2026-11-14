@@ -2,9 +2,10 @@
   "sourceWidth": 587,
   "sourceHeight": 795,
   "crop": {"x": 1, "y": 7, "width": 585, "height": 787},
-  "waterlineSourceY": 637.6,
+  "waterlineSourceY": 642,
   "beamMeters": 38.9,
-  "draftMeters": 10.4,
+  "draftMeters": 10.107350427350427,
+  "nominalDraftMeters": 10.4,
   "deckHeightMeters": 8.0,
-  "registration": "Estimated from silhouette beam and draft; not a verified engine waterline. The full PNG height is not forced to size[2]."
+  "registration": "Waterline follows the user-identified gray/green paint boundary, approximately y=642 in the 587x795 original. Image draft is measured from that line to crop bottom using the same scale as the 38.9m beam; it is not forced to nominal draft. Preserve image aspect ratio with equal horizontal and vertical scales."
 }

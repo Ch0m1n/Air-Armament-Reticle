@@ -45,7 +45,7 @@ html[data-theme="light"] button[aria-pressed="true"]{background:#deeee5!importan
    <article><h3>Reference release<span id="referenceLabel"></span></h3><canvas id="reference" aria-label="Reference release top and side views"></canvas></article>
    <article><h3>Later release<span id="laterLabel"></span></h3><canvas id="late" aria-label="Later release top and side views"></canvas></article>
   </div>
-  <div class="compare-caption" id="caption">Distances from release · Map / ballistic meters · Side-view height ×2</div>
+  <div class="compare-caption" id="caption">Distances from release · Map / ballistic meters · Equal X/Y scale</div>
  </section>
  <aside aria-label="Target and release settings"><h2>Target &amp; release</h2>
   <div><label><span>Release offset <output id="offsetValue">0 m</output></span><input id="offset" type="range" min="-600" max="600" step="10" value="0" aria-label="Release offset"></label>
@@ -69,7 +69,7 @@ if (!DATA) {
 } else {
 const HULL_TO_MAP=DATA.nativeEvidence.values.BW_TO_BALLISTIC/DATA.nativeEvidence.values.BW_TO_SHIP;
 const yamatoImage=new Image();yamatoImage.src=/*__YAMATO_IMAGE__*/null;yamatoImage.onload=()=>schedule();
-const FRONT=/*__FRONT_REFERENCE__*/null,SIDE_VERTICAL=2;
+const FRONT=/*__FRONT_REFERENCE__*/null,SIDE_VERTICAL=1;
 const yamatoFront=new Image();yamatoFront.src=/*__YAMATO_FRONT__*/null;yamatoFront.onload=()=>schedule();
 const HULL=/*__HULL_REFERENCE__*/null,createHullContact=/*__HULL_CONTACT__*/null;
 const hullContact=createHullContact(HULL,HULL_TO_MAP);
@@ -240,7 +240,7 @@ function plot(canvas,delta,compact){
  for(const p of displayBombs){dot(ctx,topX(origin+p.x),mid+p.z*topScale,p.hit?4.5:3.5,p.hit?'#ff963f':colors.pink)}
  ctx.restore();
  line(ctx,pad,sideTop-20,w-pad,sideTop-20);
- text(ctx,state.heading===0?'Side view · Yamato front':state.heading===180?'Side view · Yamato reference (180°)':state.heading===90?'Side view · Yamato broadside':'Side view · projected hull (schematic)',pad,sideTop,colors.text,compact?11:13);text(ctx,'Height ×2*',w-pad,sideTop+15,colors.muted,10,'right');
+ text(ctx,state.heading===0?'Side view · Yamato front':state.heading===180?'Side view · Yamato reference (180°)':state.heading===90?'Side view · Yamato broadside':'Side view · projected hull (schematic)',pad,sideTop,colors.text,compact?11:13);text(ctx,'Equal X/Y scale',w-pad,sideTop+15,colors.muted,10,'right');
  text(ctx,sideDetail?'Target area':'Entire run',pad,sideTop+16,colors.muted,10);
  ctx.save();ctx.beginPath();ctx.rect(pad,sideTop+22,w-pad*2,h-sideTop-56);ctx.clip();
  line(ctx,sideX(tx),sideTop+22,sideX(tx),water,colors.muted,1,[4,6]);
@@ -267,7 +267,7 @@ function drawAll(){
  if(document.activeElement!==$('targetPosition'))$('targetPosition').value=Math.round(state.target);
  const alignment=current().result.contacts.find(c=>Math.abs(state.target-state.offset-c.distanceMeters)<.01);
  $('readout').innerHTML=`<p><span>Target position</span><strong>${fmt(state.target)} m</strong></p><p><span>Contact alignment</span><strong>${snapped?'C'+snapped.stage:alignment?'C'+alignment.stage:'—'}</strong></p><p><span>Target alignment offset</span><strong>${label(state.offset).split(' from')[0]}</strong></p><span class="note">Orange: approximate hull contact. Side-profile heights extended across the top-view hull. No armor or damage calculation.</span>`;
- $('caption').textContent='Pink: moving bomb · Orange: stopped hull contact · Illustrative dispersion, not hit probability · Native hull scale ×2 · Height ×2 · Estimated waterlines · Intermediate headings: projected silhouette';
+ $('caption').textContent='Pink: moving bomb · Orange: stopped hull contact · Illustrative dispersion, not hit probability · Native hull scale ×2 · Equal X/Y scale · Reference-image waterlines · Intermediate headings: projected silhouette';
  if(embedded){
   const canvases=(compare?[$('early'),$('reference'),$('late')]:[$('linked')]).filter(c=>c.getBoundingClientRect().width>0);
   if(canvases.length){

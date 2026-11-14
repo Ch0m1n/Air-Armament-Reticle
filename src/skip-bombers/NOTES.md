@@ -20,7 +20,7 @@ scenarios continue to use the same sample.
 The site's card/list controls arrange multiple selected ships side by side or
 in full-width rows. Same scale selects a common pixels-per-map-meter ratio
 across all visible ship plots, separately for top and side views. Side-view
-height retains its additional x2 exaggeration. The smallest independently
+height uses the same scale as horizontal distance. The smallest independently
 requested scale is used to fit every selected plot, including timing scenarios;
 scales are recomputed after viewport and display-range changes. Turn Same scale
 off to fit each ship independently. Layout and scale changes preserve samples,
@@ -46,7 +46,7 @@ Individual flight times and bounce heights depend on sampled contact geometry.
 ## Yamato reference and contacts
 
 The reference is 263 x 38.9 ship meters. The native ship-to-map scale is x2;
-side-view height is additionally exaggerated x2 for visibility. Top and side
+side-view height uses the same scale as horizontal distance. Top and side
 views use consistent world-space bomb positions and contact timestamps.
 
 Orange markers stop at the earliest approximate hull contact. Misses continue.
@@ -57,9 +57,15 @@ This is a solid height envelope, not a 3D collision mesh. Thin rigging is exclud
 Trajectory segments near the hull are sampled at no more than 0.25 map meters
 and the first entry is refined by bisection; narrower features may be missed.
 
-Waterlines are estimated from the supplied reference images. Side-image length
-registration gives approximately 10.42 m draft, compared with 10.4 m in the front
-reference. At 90 degrees the supplied side image is shown; 0 degrees uses the
+Waterlines follow the supplied reference images. The front waterline is at the
+user-identified gray/green paint boundary (approximately y=642 in the original
+587x795 image). Its image-derived submerged depth is about 10.11 m using the
+38.9 m beam calibration; the image is not stretched to force nominal 10.4 m draft.
+Side-image registration gives approximately 10.42 m draft. These image-derived
+values are approximate. Front and side bitmaps retain their original aspect
+ratios; no underwater extension is added to them. The previous x2 vertical
+exaggeration has been removed from both the ship references and trajectories.
+At 90 degrees the supplied side image is shown; 0 degrees uses the
 front image. At 180 degrees the same front reference image is reused as a
 simplified end-on silhouette; it is not a separately captured stern image.
 Intermediate headings use a projected roof silhouette. Contact geometry still
