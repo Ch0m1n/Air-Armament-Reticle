@@ -1,0 +1,39 @@
+'use strict';
+
+function buildSalvo(row, aim, seed) {
+ const r=row.result,n=row.bombs;
+ const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+ const width=c=>(aim==='max'?c.maxWidthMeters:c.fullWidthMeters);
+ const depth=c=>(aim==='max'?c.maxLengthMeters:c.fullLengthMeters);
+ // Independent stratified stage samples are illustrative, not recovered game RNG.
+ const stages=r.contacts.map(c=>{
+  const ranks=Array.from({length:n},(_,i)=>i);
+  for(let i=n-1;i>0;i--){const j=Math.floor(random()*(i+1));[ranks[i],ranks[j]]=[ranks[j],ranks[i]]}
+  return ranks.map(rank=>({x:c.distanceMeters+(random()*2-1)*depth(c)/2,
+   z:((rank+random())/n*2-1)*width(c)/2}));
+ });
+ return Array.from({length:n},(_,i)=>{
+  const contacts=stages.map(stage=>stage[i]),first=contacts[0],points=[];
+  const firstLength=Math.hypot(first.x,first.z),initialTime=r.initialTime;
+  const initialSpeed=Math.hypot(firstLength,r.heightMeters)/initialTime;
+  const initialAngle=Math.min(Math.atan2(r.heightMeters,firstLength),row.maxSkipAngleDeg*Math.PI/180);
+  for(let k=0;k<=50;k++){const q=k/50;points.push({x:first.x*q,z:first.z*q,y:r.heightMeters*(1-q*q),t:initialTime*q})}
+  const arcs=[];let elapsed=initialTime;
+  for(let j=0;j<contacts.length-1;j++){
+   const a=contacts[j],b=contacts[j+1],s=row.skips[j],length=Math.hypot(b.x-a.x,b.z-a.z);
+   const angle=Math.min(initialAngle*s[4],row.maxSkipAngleDeg*Math.PI/180);
+   const vx=initialSpeed*s[2]*Math.cos(angle),time=length/vx;
+   // Same visual path helper as calculateBombTrajParams / calculateBombPosition.
+   const vy=Math.tan(angle)*length*.5,g=-2*vy/time;
+   arcs.push({length,time,vy,g,angle,vx,startTime:elapsed,peak:vy*time/4});
+   for(let k=1;k<=80;k++){
+    const q=k/80,t=time*q;
+    points.push({x:a.x+(b.x-a.x)*q,z:a.z+(b.z-a.z)*q,y:Math.max(0,vy*t+.5*g*t*t),t:elapsed+t});
+   }
+   elapsed+=time;
+  }
+  return {contacts,points,arcs,duration:elapsed};
+ });
+}
+
+module.exports={buildSalvo};

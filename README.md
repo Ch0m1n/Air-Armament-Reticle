@@ -3,6 +3,16 @@
 A static comparison tool for aircraft weapon aiming areas inspired by jcw780's wows ballistics, built for GitHub Pages.
 
 ## https://ch0m1n.github.io/Air-Armament-Reticle/
+
+Standalone skip-bomber research preview: https://ch0m1n.github.io/Air-Armament-Reticle/skip-bombers/
+
+The separate preview includes Béarn, Max Immelmann and Admiral Nakhimov,
+linked top/side playback, new salvo sampling, shared-sample release timing
+comparisons, and approximate Yamato hull contacts. It is built from
+`src/skip-bombers/` by `tools/build-skip-bombers.mjs`; see that folder's
+`NOTES.md` for limitations. This does not enable skip geometry in the main
+multi-ship comparison workspace.
+
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
 ## Data Layout

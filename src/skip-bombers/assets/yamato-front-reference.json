@@ -1,0 +1,10 @@
+{
+  "sourceWidth": 587,
+  "sourceHeight": 795,
+  "crop": {"x": 1, "y": 7, "width": 585, "height": 787},
+  "waterlineSourceY": 637.6,
+  "beamMeters": 38.9,
+  "draftMeters": 10.4,
+  "deckHeightMeters": 8.0,
+  "registration": "Estimated from silhouette beam and draft; not a verified engine waterline. The full PNG height is not forced to size[2]."
+}

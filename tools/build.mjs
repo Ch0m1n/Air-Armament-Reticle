@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {buildSkipBombers} from './build-skip-bombers.mjs';
 const root=path.resolve(import.meta.dirname,'..');
 const source=fs.readFileSync(path.join(root,'src/viewer-source.html'),'utf8');
 let engine=source.match(/<script>([\s\S]*?)<\/script>/)[1].split('// UI')[0];
@@ -38,5 +39,6 @@ for(const dataset of JSON.parse(catalog).datasets) {
 let html=fs.readFileSync(path.join(root,'src/shell.html'),'utf8');
 for(const [name,filename]of Object.entries(assets))html=html.replaceAll('{{'+name+'}}',filename);
 fs.writeFileSync(path.join(out,'index.html'),html);
+buildSkipBombers(root,out,'data:image/png;base64,'+image[1]);
 fs.writeFileSync(path.join(out,'.nojekyll'),'');
 console.log('Built static site in dist/');
