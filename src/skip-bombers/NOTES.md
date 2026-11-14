@@ -60,7 +60,10 @@ and the first entry is refined by bisection; narrower features may be missed.
 Waterlines are estimated from the supplied reference images. Side-image length
 registration gives approximately 10.42 m draft, compared with 10.4 m in the front
 reference. At 90 degrees the supplied side image is shown; 0 degrees uses the
-front image. Other headings use a projected roof silhouette.
+front image. At 180 degrees the same front reference image is reused as a
+simplified end-on silhouette; it is not a separately captured stern image.
+Intermediate headings use a projected roof silhouette. Contact geometry still
+uses the selected heading, including the fore/aft reversal at 180 degrees.
 
 Changing target position, heading, dispersion or release offset updates contacts.
 Rewind and reset clear visible markers until their contact times are reached.
