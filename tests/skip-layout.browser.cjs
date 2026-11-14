@@ -14,7 +14,7 @@ let browser;
  const frames=async()=>{
   const nodes=await page.locator('#comparison-skip iframe').elementHandles();assert.equal(nodes.length,2);
   const result=[];
-  for(const node of nodes){await node.waitForElementState('visible');const f=await node.contentFrame();await f.waitForFunction(()=>window.setSkipSharedScale&&document.querySelector('#linked').dataset.bombs);result.push(f)}
+  for(const node of nodes){await node.waitForElementState('visible');const f=await node.contentFrame();await f.waitForFunction(()=>window.setSkipSharedScale&&document.querySelector(previewState.view==='compare'?'#reference':'#linked').dataset.bombs);result.push(f)}
   return result;
  };
  const scales=()=>page.evaluate(()=>Array.from(document.querySelectorAll('#comparison-skip iframe')).flatMap(frame=>{
@@ -28,7 +28,7 @@ let browser;
   });
   const values=await scales();values.forEach(s=>assert.ok(Math.abs(s.hull/s.top-526)<1e-8));return values;
  };
- const snapshots=async()=>{const fs=await frames();return Promise.all(fs.map(f=>f.locator('#linked').evaluate(c=>({seed:c.dataset.salvoSeed,bombs:JSON.parse(c.dataset.bombs)}))))};
+ const snapshots=async()=>{const fs=await frames();return Promise.all(fs.map(f=>f.evaluate(()=>{const c=document.querySelector(previewState.view==='compare'?'#reference':'#linked');return {seed:c.dataset.salvoSeed,bombs:JSON.parse(c.dataset.bombs)}})))};
  let fs=await frames();await equal();
  assert.equal(await page.locator('#shared-scale').isEnabled(),true);
  const cards=await page.locator('#comparison-skip .skip-card').evaluateAll(cs=>cs.map(c=>{const r=c.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width}}));

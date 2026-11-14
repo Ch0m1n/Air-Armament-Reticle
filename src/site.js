@@ -7,6 +7,46 @@ const comparisonKinds=()=>comparisonOrder.filter(kind=>selections.some(item=>ite
 const supportedRoles=new Set(['bomb','torpedo','airstrike','attack']);
 const skipSessions=new Map();
 const skipScaleRequests=new Map();
+const skipDurations=new Map();
+// The comparison clock is elapsed seconds, independent of each flight's duration.
+const skipTransport={seconds:0,playing:false,linked:false,frame:0,last:0};
+const skipWindows=()=>Array.from(document.querySelectorAll('iframe[data-skip-id]')).map(f=>f.contentWindow);
+const skipEndTime=()=>Math.max(0,...skipDurations.values());
+function updateSkipTransport(){
+  const play=ui('skip-play-all'),slider=ui('skip-time');if(!play||!slider)return;
+  const end=skipEndTime(),count=skipWindows().length,ready=count>0&&skipDurations.size===count;
+  if(ready&&skipTransport.linked&&skipTransport.seconds>end){skipTransport.seconds=end;for(const win of skipWindows())win.setSkipTime?.(end)}
+  play.disabled=!ready;ui('skip-reset-all').disabled=!ready;slider.disabled=!ready;
+  play.textContent=skipTransport.playing?'Pause all':'Play all';
+  slider.max=Math.max(end,skipTransport.seconds,.01);slider.value=skipTransport.seconds;
+  ui('skip-clock').textContent=skipTransport.seconds.toFixed(2)+' / '+end.toFixed(2)+' s';
+}
+function pauseSkipTransport(){cancelAnimationFrame(skipTransport.frame);skipTransport.playing=false;updateSkipTransport()}
+function releaseSharedSkipPlayback(){pauseSkipTransport();skipTransport.linked=false;for(const win of skipWindows())win.releaseSkipTime?.()}
+window.releaseSharedSkipPlayback=releaseSharedSkipPlayback;
+function applySkipTime(){for(const win of skipWindows())win.setSkipTime?.(skipTransport.seconds);updateSkipTransport()}
+function tickSkipTransport(now){
+  if(!skipTransport.playing)return;
+  skipTransport.seconds=Math.min(skipEndTime(),skipTransport.seconds+(now-skipTransport.last)/1000);skipTransport.last=now;
+  if(skipTransport.seconds>=skipEndTime())skipTransport.playing=false;
+  applySkipTime();if(skipTransport.playing)skipTransport.frame=requestAnimationFrame(tickSkipTransport);
+}
+function skipTransportTools(){return `<div class="skip-transport" role="group" aria-label="Shared skip-bomber playback"><button id="skip-play-all" type="button" disabled>Play all</button><button id="skip-reset-all" type="button" disabled>Reset all</button><input id="skip-time" type="range" min="0" max="1" step="any" value="${skipTransport.seconds}" aria-label="Shared playback time in seconds" disabled><output id="skip-clock">0.00 s</output><span>Time from release · Shorter flights hold their final position</span></div>`}
+ui('results').addEventListener('click',event=>{
+  const id=event.target.closest('button')?.id;
+  if(id==='skip-play-all'){
+    if(skipTransport.playing){pauseSkipTransport();return}
+    if(skipTransport.seconds>=skipEndTime())skipTransport.seconds=0;
+    skipTransport.linked=true;skipTransport.playing=true;skipTransport.last=performance.now();applySkipTime();
+    skipTransport.frame=requestAnimationFrame(tickSkipTransport);
+  }else if(id==='skip-reset-all'){pauseSkipTransport();skipTransport.linked=true;skipTransport.seconds=0;applySkipTime()}
+});
+ui('results').addEventListener('input',event=>{
+  if(event.target.id!=='skip-time')return;
+  const seconds=Number(event.target.value);
+  pauseSkipTransport();skipTransport.linked=true;skipTransport.seconds=Math.max(0,Math.min(skipEndTime(),seconds));applySkipTime();
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseSkipTransport()});
 function updateSkipSharedScale(){
   const frames=[...document.querySelectorAll('iframe[data-skip-id]')];
   const requests=frames.map(f=>skipScaleRequests.get(Number(f.dataset.skipId))).filter(Boolean);
@@ -34,11 +74,15 @@ function skipCard(item){
 }
 function mountSkipFrames(){
   skipScaleRequests.clear();
+  skipDurations.clear();
   for(const frame of document.querySelectorAll('iframe[data-skip-id]'))frame.addEventListener('load',()=>{
     const session=skipSessions.get(Number(frame.dataset.skipId));if(!session)return;
     frame.contentWindow.setSkipSelection(session.row,session.saved,document.documentElement.dataset.theme||'light');
     frame.contentWindow.setSkipSharedScale(sharedScale?{}:null);
+    skipDurations.set(Number(frame.dataset.skipId),frame.contentWindow.getSkipDuration());
+    if(skipTransport.linked)frame.contentWindow.setSkipTime(skipTransport.seconds);
     frame.style.visibility='visible';
+    updateSkipTransport();
     if(comparisonRole!=='skip')frame.contentWindow.pauseSkipPlayback();
   },{once:true});
   for(const id of skipSessions.keys())if(!selections.some(item=>item.id===id))skipSessions.delete(id);
@@ -47,6 +91,13 @@ window.addEventListener('message',event=>{
   if(event.origin!==location.origin)return;
   const frame=Array.from(document.querySelectorAll('iframe[data-skip-id]')).find(f=>f.contentWindow===event.source);
   if(!frame)return;
+  if(event.data?.type==='skip-preview-duration'){
+    if(Number.isFinite(event.data.duration)&&event.data.duration>0){skipDurations.set(Number(frame.dataset.skipId),event.data.duration);updateSkipTransport()}
+    return;
+  }
+  if(event.data?.type==='skip-preview-local-playback'){
+    releaseSharedSkipPlayback();return;
+  }
   if(event.data?.type==='skip-preview-scale'){
     const scales=event.data.scales;
     if(scales&&[scales.top,scales.side].every(n=>Number.isFinite(n)&&n>0)){
@@ -192,6 +243,7 @@ ui('comparison-tabs').addEventListener('keydown',event=>{
   if(next!=null){event.preventDefault();selectComparisonRole(kinds[next],true);}
 });
 function renderComparison(focus=null) {
+  pauseSkipTransport();
   saveSkipSessions();
   const positions=new Map(shipSlots.map((slot,index)=>[slot.id,index]));
   selections.sort((a,b)=>(positions.get(a.slotId)??shipSlots.length)-(positions.get(b.slotId)??shipSlots.length));
@@ -210,7 +262,7 @@ function renderComparison(focus=null) {
   for(const id of ['shared-scale','cards-view','list-view'])ui(id).disabled=false;
   ui('results').innerHTML=kinds.map(kind=>{
     const label=roleNames[kind];
-    if(kind==='skip')return `<section id="comparison-skip" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-skip" data-comparison-role="skip"${kind===comparisonRole?'':' hidden'}><div class="skip-comparison ${cardView?'comparison-cards':'comparison-list'}">${selections.filter(item=>item.kind==='skip').map(skipCard).join('')}</div></section>`;
+    if(kind==='skip')return `<section id="comparison-skip" class="comparison-group" role="tabpanel" aria-labelledby="comparison-tab-skip" data-comparison-role="skip"${kind===comparisonRole?'':' hidden'}>${skipTransportTools()}<div class="skip-comparison ${cardView?'comparison-cards':'comparison-list'}">${selections.filter(item=>item.kind==='skip').map(skipCard).join('')}</div></section>`;
     const members=supportedRoles.has(kind)?selections.filter(item=>item.kind===kind):[];
     const distanceLimit=torpedoDistanceLimit();
     const metricExtent=sharedScale?commonMetricExtent(members):null,torpedoExtent=commonDistance(members),formationScale=commonScale(members,distanceLimit);

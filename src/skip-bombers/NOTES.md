@@ -20,6 +20,16 @@ scales are recomputed after viewport and display-range changes. Turn Same scale
 off to fit each ship independently. Layout and scale changes preserve samples,
 controls and paused playback positions.
 
+Play all uses one elapsed-seconds clock for every selected aircraft. Pause all,
+Reset all and the shared time slider update every ship together. For example,
+2 seconds means the position 2 seconds after release for every aircraft,
+regardless of each flight's total duration. Completed flights hold their last
+position; the shared clock stops when the longest flight ends. Individual loop
+settings do not apply during shared playback. Existing salvos are retained.
+An individual Play/Reset/New salvo/aim/time control exits shared playback.
+Layout, scale or tab changes pause shared playback and retain its time; Play all
+resumes it. Hiding the browser page also pauses the shared clock.
+
 New salvo generates a new illustrative sample and resets the playback position.
 Press Play to view it. Reset, replay and loops retain that sample. All three
 release-timing comparisons use the same sample with different release origins.

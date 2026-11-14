@@ -15,6 +15,10 @@ map meter across all selected ships, separately for top and side views (side
 height keeps its x2 exaggeration), including release-timing comparisons.
 Turn it off for independent automatic fitting. Layout and scale changes retain
 each aircraft's current sample and playback position.
+Use **Play all**, **Pause all**, **Reset all** and the shared time slider to
+compare positions at the same elapsed seconds from release. Shorter flights
+hold their final positions until the longest flight ends. Shared playback does
+not reroll salvos; individual playback controls return to independent operation.
 Both legacy `skips` rows and ordered `SkipsSequence` data are supported. WoWS
 uses the Korabli display-trajectory model as an explicitly labeled estimate.
 The embedded renderer is built from `src/skip-bombers/` by

@@ -78,6 +78,8 @@ const $ = id => document.getElementById(id);
 const state = {ship:0,aim:'full',view:'linked',target:0,center:0,progress:0,playing:false,offset:0,interval:250,heading:0,length:263,salvoSeed:11317};
 const embedded=new URLSearchParams(location.search).has('embedded');
 let sharedScaleSettings=null,sharedScaleEnabled=false,lastScaleReport='';
+let externalTime=null,lastDurationReport=null;
+let selectionConfigured=!embedded;
 document.documentElement.dataset.embedded=String(embedded);
 const plotGeometry=new Map();let drag=null,snapped=null;
 const colors={line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'};
@@ -95,6 +97,7 @@ function syncShip(){
  state.progress=0;$('time').value=0;schedule();
 }
 function duration(){return Math.max(...bombPaths().map(p=>p.at(-1).t))}
+function playbackTime(){return externalTime??state.progress*duration()}
 function trajectory(){
  const r=current().result,points=[];
  for(let i=0;i<=50;i++){const q=i/50;points.push({x:r.contacts[0].distanceMeters*q,y:r.heightMeters*(1-q*q),t:r.initialTime*q})}
@@ -102,7 +105,7 @@ function trajectory(){
  for(const a of r.arcs){a.points.forEach((p,i)=>points.push({x:p[0]*30,y:p[1]*30,t:t+a.renderTime*i/(a.points.length-1)}));t+=a.renderTime}
  return points;
 }
-function cursorAt(points){const t=state.progress*duration();let i=points.findIndex(p=>p.t>=t);if(i<1)return i===0?points[0]:points.at(-1);const a=points[i-1],b=points[i],f=(t-a.t)/(b.t-a.t||1);return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,t}}
+function cursorAt(points){const t=playbackTime();let i=points.findIndex(p=>p.t>=t);if(i<1)return i===0?points[0]:points.at(-1);const a=points[i-1],b=points[i],f=(t-a.t)/(b.t-a.t||1);return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,t}}
 const bombCache=new Map();
 const buildSalvo=/*__SALVO_MODEL__*/null;
 function bombPaths(){
@@ -119,7 +122,7 @@ function contactsFor(delta){
  if(!contactSets.has(delta))contactSets.set(delta,bombPaths().map(path=>hullContact.firstContact(path,state.target,state.heading,state.offset+delta)));
  return contactSets.get(delta);
 }
-function visibleBombs(delta){const hits=contactsFor(delta),time=state.progress*duration();return bombPaths().map((path,i)=>hits[i]&&time>=hits[i].t?{...hits[i],hit:true}:bombAt(path))}
+function visibleBombs(delta){const hits=contactsFor(delta),time=playbackTime();return bombPaths().map((path,i)=>hits[i]&&time>=hits[i].t?{...hits[i],hit:true}:bombAt(path))}
 function stoppedPath(path,hit){return hit?[...path.filter(p=>p.t<hit.t),hit]:path}
 function line(ctx,x,y,x2,y2,c=colors.line,width=1,dash=[]){ctx.beginPath();ctx.strokeStyle=c;ctx.lineWidth=width;ctx.setLineDash(dash);ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([])}
 function text(ctx,s,x,y,c=colors.muted,size=12,align='left'){ctx.fillStyle=c;ctx.font=`${size}px system-ui, sans-serif`;ctx.textAlign=align;ctx.fillText(s,x,y)}
@@ -250,12 +253,14 @@ function plot(canvas,delta,compact){
  line(ctx,cx,sideTop+22,cx,water+8,colors.pink,1,[2,5]);
  for(const b of displayBombs){dot(ctx,sideX(origin+b.x),water-b.y*heightScale*SIDE_VERTICAL,b.hit?4.5:3.5,b.hit?'#ff963f':colors.pink)}ctx.restore();
  if(topCursor>=pad&&topCursor<=w-pad)line(ctx,topCursor,topY,topCursor,mid+95,colors.pink,1,[2,5]);
- text(ctx,`Travel ${fmt(p.x)} m · Hull contacts ${displayBombs.filter(b=>b.hit).length}/${bombs.length}`,pad,h-21,colors.muted,11);text(ctx,`${(state.progress*duration()).toFixed(2)} s`,w-pad,h-21,colors.pink,11,'right');
+ text(ctx,`Travel ${fmt(p.x)} m · Hull contacts ${displayBombs.filter(b=>b.hit).length}/${bombs.length}`,pad,h-21,colors.muted,11);text(ctx,`${playbackTime().toFixed(2)} s`,w-pad,h-21,colors.pink,11,'right');
 }
 function drawAll(){
+ if(!selectionConfigured)return;
  const compare=state.view==='compare';$('single').hidden=compare;$('comparison').hidden=!compare;$('plotTitle').textContent=compare?'Release timing':'Top view & bounce profile';
  $('offsetValue').textContent=`${state.offset>0?'+':''}${state.offset} m`;$('intervalValue').textContent=`${state.interval} m`;$('headingValue').textContent=`${state.heading}°`;
- $('clock').textContent=`${(state.progress*duration()).toFixed(2)} s`;
+ $('clock').textContent=`${playbackTime().toFixed(2)} s`;
+ if(embedded&&lastDurationReport!==duration()){lastDurationReport=duration();parent.postMessage({type:'skip-preview-duration',duration:lastDurationReport},location.origin)}
  const label=n=>`${n>0?'+':''}${fmt(n)} m from reference`;
  $('earlierLabel').textContent=label(state.offset-state.interval);$('referenceLabel').textContent=label(state.offset);$('laterLabel').textContent=label(state.offset+state.interval);
  if(compare){plot($('early'),-state.interval,true);plot($('reference'),0,true);plot($('late'),state.interval,true)}else plot($('linked'),0,false);
@@ -319,9 +324,28 @@ $('newSalvo').onclick=()=>{
  resetPlayback();
 };
 $('time').oninput=e=>{state.progress=Number(e.target.value)/1000;schedule()};
+function localPlayback(){
+ externalTime=null;
+ if(embedded){
+  if(typeof parent.releaseSharedSkipPlayback==='function')parent.releaseSharedSkipPlayback();
+  else parent.postMessage({type:'skip-preview-local-playback'},location.origin);
+ }
+}
+for(const id of ['play','reset','newSalvo'])$(id).addEventListener('click',localPlayback,true);
+for(const id of ['time'])$(id).addEventListener('input',localPlayback,true);
+$('aim').addEventListener('click',localPlayback,true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.playing){cancelAnimationFrame(animation);state.playing=false;updatePlay()}});
 new ResizeObserver(schedule).observe($('single').parentElement);syncShip();
 window.previewState=state;
+window.getSkipDuration=duration;
+window.getSkipTime=playbackTime;
+window.releaseSkipTime=()=>{externalTime=null;$('loop').disabled=false;schedule()};
+window.setSkipTime=seconds=>{
+ if(!Number.isFinite(seconds)||seconds<0)return;
+ cancelAnimationFrame(animation);state.playing=false;externalTime=seconds;state.progress=Math.min(1,seconds/duration());
+ $('loop').disabled=true;
+ $('time').value=state.progress*1000;updatePlay();schedule();
+};
 window.setSkipSharedScale=settings=>{
  const enabled=settings!==null;
  const value=settings&&Number.isFinite(settings.top)&&Number.isFinite(settings.side)&&settings.top>0&&settings.side>0?settings:null;
@@ -335,6 +359,7 @@ window.setSkipTheme=theme=>{
  Object.assign(colors,theme==='light'?{line:'#cdd5d2',muted:'#5b6b63',text:'#202724',gold:'#9a6100',cyan:'#127456',pink:'#a73c62'}:{line:'#41454b',muted:'#adb3bc',text:'#f0f1f3',gold:'#efbf66',cyan:'#78d8d8',pink:'#ed9aaa'});schedule();
 };
 window.setSkipSelection=(row,saved,theme)=>{
+ selectionConfigured=true;
  window.pauseSkipPlayback();DATA.rows=[row];state.ship=0;
  bombCache.clear();contactSets.clear();contactKey='';
  const option=document.createElement('option');option.value='0';option.textContent=row.name;$('ship').replaceChildren(option);
