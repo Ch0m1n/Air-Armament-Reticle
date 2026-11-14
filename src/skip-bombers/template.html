@@ -317,12 +317,14 @@ $('play').onclick=()=>{cancelAnimationFrame(animation);state.playing=!state.play
 function resetPlayback(){cancelAnimationFrame(animation);state.playing=false;state.progress=0;$('time').value=0;updatePlay();schedule()}
 $('reset').onclick=resetPlayback;
 $('reset').title='Reset playback · Keep current dispersion';
-$('newSalvo').onclick=()=>{
+function newSalvo(){
  let next=crypto.getRandomValues(new Uint32Array(1))[0];
  if(next===state.salvoSeed)next=(next+1)>>>0;
  state.salvoSeed=next;bombCache.clear();contactSets.clear();contactKey='';
- resetPlayback();
-};
+ externalTime=null;$('loop').disabled=false;resetPlayback();
+ return duration();
+}
+$('newSalvo').onclick=newSalvo;
 $('time').oninput=e=>{state.progress=Number(e.target.value)/1000;schedule()};
 function localPlayback(){
  externalTime=null;
@@ -338,6 +340,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.play
 new ResizeObserver(schedule).observe($('single').parentElement);syncShip();
 window.previewState=state;
 window.getSkipDuration=duration;
+window.newSkipSalvo=newSalvo;
 window.getSkipTime=playbackTime;
 window.releaseSkipTime=()=>{externalTime=null;$('loop').disabled=false;schedule()};
 window.setSkipTime=seconds=>{

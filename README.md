@@ -19,6 +19,9 @@ Use **Play all**, **Pause all**, **Reset all** and the shared time slider to
 compare positions at the same elapsed seconds from release. Shorter flights
 hold their final positions until the longest flight ends. Shared playback does
 not reroll salvos; individual playback controls return to independent operation.
+**New salvo all** rerolls every compared aircraft's dispersion, resets the shared
+clock to zero and starts all ships together. Reset all and subsequent replays
+retain those new samples, including each ship's release-timing comparisons.
 Both legacy `skips` rows and ordered `SkipsSequence` data are supported. WoWS
 uses the Korabli display-trajectory model as an explicitly labeled estimate.
 The embedded renderer is built from `src/skip-bombers/` by

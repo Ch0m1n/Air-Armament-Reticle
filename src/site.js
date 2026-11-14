@@ -16,7 +16,7 @@ function updateSkipTransport(){
   const play=ui('skip-play-all'),slider=ui('skip-time');if(!play||!slider)return;
   const end=skipEndTime(),count=skipWindows().length,ready=count>0&&skipDurations.size===count;
   if(ready&&skipTransport.linked&&skipTransport.seconds>end){skipTransport.seconds=end;for(const win of skipWindows())win.setSkipTime?.(end)}
-  play.disabled=!ready;ui('skip-reset-all').disabled=!ready;slider.disabled=!ready;
+  play.disabled=!ready;ui('skip-reset-all').disabled=!ready;ui('skip-new-all').disabled=!ready;slider.disabled=!ready;
   play.textContent=skipTransport.playing?'Pause all':'Play all';
   slider.max=Math.max(end,skipTransport.seconds,.01);slider.value=skipTransport.seconds;
   ui('skip-clock').textContent=skipTransport.seconds.toFixed(2)+' / '+end.toFixed(2)+' s';
@@ -31,14 +31,21 @@ function tickSkipTransport(now){
   if(skipTransport.seconds>=skipEndTime())skipTransport.playing=false;
   applySkipTime();if(skipTransport.playing)skipTransport.frame=requestAnimationFrame(tickSkipTransport);
 }
-function skipTransportTools(){return `<div class="skip-transport" role="group" aria-label="Shared skip-bomber playback"><button id="skip-play-all" type="button" disabled>Play all</button><button id="skip-reset-all" type="button" disabled>Reset all</button><input id="skip-time" type="range" min="0" max="1" step="any" value="${skipTransport.seconds}" aria-label="Shared playback time in seconds" disabled><output id="skip-clock">0.00 s</output><span>Time from release · Shorter flights hold their final position</span></div>`}
+function startSkipTransport(){
+  skipTransport.linked=true;skipTransport.playing=true;skipTransport.last=performance.now();applySkipTime();
+  skipTransport.frame=requestAnimationFrame(tickSkipTransport);
+}
+function skipTransportTools(){return `<div class="skip-transport" role="group" aria-label="Shared skip-bomber playback"><button id="skip-new-all" type="button" disabled>New salvo all</button><button id="skip-play-all" type="button" disabled>Play all</button><button id="skip-reset-all" type="button" disabled>Reset all</button><input id="skip-time" type="range" min="0" max="1" step="any" value="${skipTransport.seconds}" aria-label="Shared playback time in seconds" disabled><output id="skip-clock">0.00 s</output><span>Time from release · Shorter flights hold their final position</span></div>`}
 ui('results').addEventListener('click',event=>{
   const id=event.target.closest('button')?.id;
   if(id==='skip-play-all'){
     if(skipTransport.playing){pauseSkipTransport();return}
     if(skipTransport.seconds>=skipEndTime())skipTransport.seconds=0;
-    skipTransport.linked=true;skipTransport.playing=true;skipTransport.last=performance.now();applySkipTime();
-    skipTransport.frame=requestAnimationFrame(tickSkipTransport);
+    startSkipTransport();
+  }else if(id==='skip-new-all'){
+    pauseSkipTransport();skipTransport.seconds=0;
+    for(const frame of document.querySelectorAll('iframe[data-skip-id]'))skipDurations.set(Number(frame.dataset.skipId),frame.contentWindow.newSkipSalvo());
+    startSkipTransport();
   }else if(id==='skip-reset-all'){pauseSkipTransport();skipTransport.linked=true;skipTransport.seconds=0;applySkipTime()}
 });
 ui('results').addEventListener('input',event=>{

@@ -11,6 +11,12 @@ capture, a hit-probability calculator, or an armor/damage model.
 
 ## Dispersion and playback
 
+New salvo all rerolls the illustrative dispersion for every compared aircraft,
+updates their flight durations, resets the common clock to zero and starts
+shared playback immediately. It can also restart a currently playing comparison.
+Reset all and later replay retain those new samples. Each ship's three timing
+scenarios continue to use the same sample.
+
 The site's card/list controls arrange multiple selected ships side by side or
 in full-width rows. Same scale selects a common pixels-per-map-meter ratio
 across all visible ship plots, separately for top and side views. Side-view

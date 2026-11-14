@@ -59,6 +59,28 @@ let browser;
  assert.equal(await children[0].evaluate(()=>previewState.playing),true);
  await children[0].getByRole('button',{name:'Pause',exact:true}).click();
  await seek(2);await page.getByRole('button',{name:'Card view',exact:true}).click();children=await frames();assert.deepEqual(await times(),[2,2]);
+ for(let run=0;run<2;run++){
+  const before=await snapshot();
+  await page.evaluate(()=>document.addEventListener('click',event=>{
+   if(event.target.id==='skip-new-all')window.newAllAtClick=Array.from(document.querySelectorAll('#comparison-skip iframe')).map(f=>({time:f.contentWindow.getSkipTime(),seed:f.contentWindow.previewState.salvoSeed}));
+  },{once:true}));
+  await page.getByRole('button',{name:'New salvo all',exact:true}).click();
+  const atClick=await page.evaluate(()=>window.newAllAtClick);
+  atClick.forEach((s,i)=>{assert.equal(s.time,0,'Every ship resets in the same click');assert.notEqual(s.seed,before[i].seed,'Every ship gets a fresh sample')});
+  await page.waitForTimeout(130);const running=await times();assert.ok(running[0]>.04);assert.equal(running[0],running[1],'New samples start playing together');
+  assert.equal(await page.getByRole('button',{name:'Pause all',exact:true}).count(),1);
+  await seek(2);const after=await snapshot();
+  after.forEach((s,i)=>assert.notDeepEqual(s.bombs,before[i].bombs,'Actual dispersion changes for every ship'));
+  const currentEnd=await page.locator('#skip-time').getAttribute('max');
+  const freshDurations=await Promise.all(children.map(f=>f.evaluate(()=>getSkipDuration())));
+  assert.ok(Math.abs(Number(currentEnd)-Math.max(...freshDurations))<1e-10,'Shared timeline uses the new flight durations');
+  await page.getByRole('button',{name:'Reset all',exact:true}).click();await seek(2);assert.deepEqual(await snapshot(),after,'Reset all reuses the newly generated samples');
+  if(run===0)await page.getByRole('button',{name:'Play all',exact:true}).click();
+ }
+ await children[0].getByRole('button',{name:'Timing comparison',exact:true}).click();await page.waitForTimeout(80);
+ const timing=await children[0].locator('#comparison canvas').evaluateAll(cs=>cs.map(c=>({seed:c.dataset.salvoSeed,bombs:JSON.parse(c.dataset.bombs)})));
+ timing.forEach(s=>assert.deepEqual(s,timing[0],'Timing comparisons retain the new shared sample'));
+ await children[0].getByRole('button',{name:'Linked views',exact:true}).click();await page.waitForTimeout(50);
  await page.locator('#comparison-skip').screenshot({path:path.join(artifacts,'skip-shared-playback-desktop.png')});
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -66,5 +88,5 @@ let browser;
  const bounds=await page.locator('.skip-transport').evaluate(e=>[...e.children].map(c=>{const r=c.getBoundingClientRect();return [r.left,r.right]}));bounds.forEach(([a,b])=>assert.ok(a>=0&&b<=390));
  await page.locator('.skip-transport').screenshot({path:path.join(artifacts,'skip-shared-playback-mobile.png')});
  assert.deepEqual(errors,[]);
- console.log('PASS: shared seconds, actual bomb coordinates, simultaneous play/pause/reset/seek, different flight lengths, finish hold, individual override, layout/scale preservation and mobile.');
+ console.log('PASS: new salvo all refreshes every sample and starts together, repeated regeneration, updated durations, same-sample replay/timing, shared seconds/coordinates, play/pause/reset/seek, finish hold, layouts and mobile.');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await browser?.close()});
