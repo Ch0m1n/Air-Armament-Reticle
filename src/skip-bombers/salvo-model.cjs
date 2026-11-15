@@ -12,11 +12,13 @@ function buildSalvo(row, aim, seed) {
   return ranks.map(rank=>({x:c.distanceMeters+(random()*2-1)*depth(c)/2,
    z:((rank+random())/n*2-1)*width(c)/2}));
  });
+ const initialTime=r.initialTime,referenceDistance=r.contacts[0].distanceMeters;
+ // The client uses the shared pack's squadronToTarget/fallTime for every bounce.
+ // Per-bomb impact dispersion changes the initial fall path, not this reference.
+ const initialSpeed=Math.hypot(referenceDistance,r.heightMeters)/initialTime;
+ const initialAngle=Math.min(Math.atan2(r.heightMeters,referenceDistance),row.maxSkipAngleDeg*Math.PI/180);
  return Array.from({length:n},(_,i)=>{
   const contacts=stages.map(stage=>stage[i]),first=contacts[0],points=[];
-  const firstLength=Math.hypot(first.x,first.z),initialTime=r.initialTime;
-  const initialSpeed=Math.hypot(firstLength,r.heightMeters)/initialTime;
-  const initialAngle=Math.min(Math.atan2(r.heightMeters,firstLength),row.maxSkipAngleDeg*Math.PI/180);
   for(let k=0;k<=50;k++){const q=k/50;points.push({x:first.x*q,z:first.z*q,y:r.heightMeters*(1-q*q),t:initialTime*q})}
   const arcs=[];let elapsed=initialTime;
   for(let j=0;j<contacts.length-1;j++){

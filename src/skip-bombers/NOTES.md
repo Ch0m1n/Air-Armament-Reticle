@@ -42,6 +42,11 @@ release-timing comparisons use the same sample with different release origins.
 Stage samples are independently stratified within the recovered footprint bounds;
 the game's random-number distribution and inter-stage correlations are unknown.
 Individual flight times and bounce heights depend on sampled contact geometry.
+Bounce reference speed and angle are shared by the modeled release pack, using
+the baseline squadron-to-target vector and fall time, as in Korabli 26.11.1 and
+WoWS 15.11 PT client code. Individual first-impact dispersion affects the initial
+fall path but does not change that shared bounce reference. Actual server RNG
+and inter-stage correlations remain unverified.
 
 ## Yamato reference and contacts
 

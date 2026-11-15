@@ -37,3 +37,31 @@ test('upper structures use the narrow front silhouette for drawing and contact',
  assert.ok(Math.abs(hit.x+.5)<1e-5,'Contact occurs at the narrow structure, not the full-beam box');
  assert.equal(hull.projectProfile(90).find(r=>r.height===2.5).right-hull.projectProfile(90).find(r=>r.height===2.5).left,10);
 });
+
+
+test('dispersion preserves the shared pack bounce speed and angle across bombs and rerolls',()=>{
+ const {buildSalvo}=require('../src/skip-bombers/salvo-model.cjs');
+ for(const row of require('../src/skip-bombers/data.json').rows){
+  const r=row.result,reference=r.contacts[0].distanceMeters;
+  const speed=Math.hypot(reference,r.heightMeters)/r.initialTime;
+  const angle=Math.min(Math.atan2(r.heightMeters,reference),row.maxSkipAngleDeg*Math.PI/180);
+  for(const aim of ['full','max'])for(const seed of [19,20,11317,4294967295]){
+   const salvo=buildSalvo(row,aim,seed);
+   assert.deepEqual(salvo,buildSalvo(row,aim,seed),'replay keeps its sampled paths');
+   assert.notDeepEqual(salvo,buildSalvo(row,aim,(seed+1)>>>0),'new salvo rerolls');
+   assert.ok(new Set(salvo.map(b=>b.contacts[0].x)).size>1,'initial impacts remain dispersed');
+   row.skips.forEach((stage,j)=>{
+    const pitch=Math.min(angle*stage[4],row.maxSkipAngleDeg*Math.PI/180);
+    const expected=speed*stage[2]*Math.cos(pitch);
+    for(const bomb of salvo){
+     const arc=bomb.arcs[j];
+     assert.ok(Math.abs(arc.vx-expected)<1e-9,'same stage uses the shared reference speed');
+     assert.ok(Math.abs(arc.angle-pitch)<1e-12);
+     assert.ok(Math.abs(arc.time*arc.vx-arc.length)<1e-8,'duration still follows individual segment length');
+     assert.ok(Math.abs(arc.vy*arc.time+.5*arc.g*arc.time**2)<1e-8,'bounce returns to water');
+    }
+   });
+   assert.ok(salvo.every(b=>b.points.every((p,i,a)=>Number.isFinite(p.t)&&p.y>=0&&(!i||p.t>a[i-1].t))));
+  }
+ }
+});
