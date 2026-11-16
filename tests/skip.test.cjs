@@ -65,3 +65,62 @@ test('dispersion preserves the shared pack bounce speed and angle across bombs a
   }
  }
 });
+
+
+test('aircraft groups stay ordered while multi-bomb aircraft can exchange bomb order',()=>{
+ const {buildSalvo}=require('../src/skip-bombers/salvo-model.cjs');
+ let exchanges=0;
+ for(const source of require('../src/skip-bombers/data.json').rows)for(const aim of ['full','max'])for(let seed=1;seed<=50;seed++){
+  const row={...source,attackGroup:{...source.attackGroup}},salvo=buildSalvo(row,aim,seed),r=row.result;
+  const planeOrder=j=>Array.from({length:row.attackGroup.aircraft},(_,plane)=>({plane,z:salvo.filter(b=>b.planeIndex===plane).reduce((sum,b)=>sum+b.contacts[j].z,0)/(row.attackGroup.projectilesPerRelease*row.attackGroup.releases)})).sort((a,b)=>a.z-b.z).map(p=>p.plane);
+  const first=planeOrder(0);
+  for(let j=0;j<r.contacts.length;j++){
+   assert.deepEqual(planeOrder(j),first);
+   const c=r.contacts[j],w=aim==='max'?c.maxWidthMeters:c.fullWidthMeters;
+   first.forEach((plane,rank)=>{
+    const bombs=salvo.filter(b=>b.planeIndex===plane);
+    assert.equal(bombs.length,row.attackGroup.projectilesPerRelease*row.attackGroup.releases);
+    for(const b of bombs){const q=(b.contacts[j].z/w+.5)*first.length;assert.ok(q>=rank-1e-12&&q<rank+1+1e-12)}
+   });
+  }
+  const order=j=>salvo.map((b,i)=>({i,z:b.contacts[j].z})).sort((a,b)=>a.z-b.z).map(p=>p.i).join(',');
+  if(row.attackGroup.projectilesPerRelease>1&&order(0)!==order(1))exchanges++;
+ }
+ assert.ok(exchanges>20,'multi-bomb aircraft are not locked into separate per-bomb strata');
+ const row=reconstructSkip({...plane,attackCount:2},weapon),salvo=buildSalvo(row,'full',19);
+ assert.equal(salvo.length,8);
+ for(let i=0;i<2;i++)assert.equal(new Set(salvo.filter(b=>b.planeIndex===i).map(b=>b.releaseIndex+':'+b.projectileIndex)).size,4);
+ assert.throws(()=>reconstructSkip({...plane,attackerSize:1.5},weapon),/payload count/);
+ assert.throws(()=>buildSalvo({...row,attackGroup:null},'full',1),/grouping/);
+});
+
+
+test('aircraft grouping reproduces the main patterns of four independent replay sets',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const {buildSalvo}=require('../src/skip-bombers/salvo-model.cjs');
+ const observations=require('./fixtures/skip-dispersion-observations.json').cases;
+ const results=[];
+ for(const observed of observations){
+  const root=path.resolve(__dirname,'../GAME',observed.game,observed.version);
+  const plane=JSON.parse(fs.readFileSync(path.join(root,'Aircraft',observed.aircraft+'.json')));
+  const weapon=JSON.parse(fs.readFileSync(path.join(root,'Projectiles',observed.weapon+'.json')));
+  const row=reconstructSkip(plane,weapon),xs=[[],[]];let exchanges=0;
+  assert.equal(row.attackGroup.aircraft,observed.planes);
+  assert.equal(row.attackGroup.projectilesPerRelease*row.attackGroup.releases,observed.bombsPerPlane);
+  for(let seed=1;seed<=500;seed++){
+   const salvo=buildSalvo(row,'full',seed),last=row.result.contacts.length-1;
+   const bombOrder=j=>salvo.map((b,i)=>({i,z:b.contacts[j].z})).sort((a,b)=>a.z-b.z).map(b=>b.i).join(',');
+   if(bombOrder(0)!==bombOrder(last))exchanges++;
+   for(const [k,j]of [0,last].entries()){
+    const mean=salvo.reduce((s,b)=>s+b.contacts[j].z,0)/salvo.length;
+    xs[k].push(...salvo.map(b=>b.contacts[j].z-mean));
+   }
+  }
+  const [a,b]=xs,r=a.reduce((s,x,i)=>s+x*b[i],0)/Math.sqrt(a.reduce((s,x)=>s+x*x,0)*b.reduce((s,x)=>s+x*x,0));
+  assert.ok(Math.abs(r-observed.lateralCorrelation)<.12,'matches the broad observed persistence without per-ship fit coefficients');
+  if(observed.bombsPerPlane===1)assert.equal(exchanges,0);
+  else assert.ok(exchanges>250,'same-plane bombs can exchange order');
+  results.push({name:observed.name,observed:observed.lateralCorrelation,simulated:r,exchanges});
+ }
+ console.log('Replay aggregate comparison:',JSON.stringify(results));
+});

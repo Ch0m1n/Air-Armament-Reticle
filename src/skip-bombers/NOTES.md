@@ -39,14 +39,28 @@ resumes it. Hiding the browser page also pauses the shared clock.
 New salvo generates a new illustrative sample and resets the playback position.
 Press Play to view it. Reset, replay and loops retain that sample. All three
 release-timing comparisons use the same sample with different release origins.
-Stage samples are independently stratified within the recovered footprint bounds;
-the game's random-number distribution and inter-stage correlations are unknown.
+Each attacking aircraft retains its lateral stratum across contacts. Every bomb
+from that aircraft receives fresh within-stratum jitter at each stage, so bombs
+from the same aircraft can exchange lateral order. Aircraft count and bombs per
+aircraft come from the selected aircraft's attackerSize, projectilesPerAttack and
+attackCount. Missing or fractional grouping inputs are rejected.
+
+This model is supported by 11 Korabli 26.11.1 Nakhimov salvos and WoWS 15.10
+Bearn (20), Immelmann (26 full-aim comparison salvos) and Shinano (23). One probable
+partial-aim Immelmann salvo is kept separate. Bearn's two bombs per aircraft do
+exchange order, so assigning one permanent stratum to every bomb was too strict.
+Longitudinal offsets continue to be sampled independently at each contact.
+Equal-width aircraft strata and uniform jitter remain empirical assumptions;
+server RNG, exact probability density and intermediate aiming accuracy have not
+been recovered. Small samples do not validate hit probabilities. Multiple release
+counts retain their aircraft grouping; per-release timing is not reconstructed.
+
 Individual flight times and bounce heights depend on sampled contact geometry.
 Bounce reference speed and angle are shared by the modeled release pack, using
 the baseline squadron-to-target vector and fall time, as in Korabli 26.11.1 and
 WoWS 15.11 PT client code. Individual first-impact dispersion affects the initial
 fall path but does not change that shared bounce reference. Actual server RNG
-and inter-stage correlations remain unverified.
+and the exact inter-stage dependence remain unverified.
 
 ## Yamato reference and contacts
 

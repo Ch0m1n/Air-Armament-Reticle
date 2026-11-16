@@ -1,17 +1,21 @@
 'use strict';
 
 function buildSalvo(row, aim, seed) {
- const r=row.result,n=row.bombs;
+ const r=row.result,n=row.bombs,group=row.attackGroup;
+ if(!group||![group.aircraft,group.projectilesPerRelease,group.releases].every(v=>Number.isInteger(v)&&v>0)||group.aircraft*group.projectilesPerRelease*group.releases!==n)throw Error('Skip-bomber aircraft grouping is unavailable');
+ const perAircraft=group.projectilesPerRelease*group.releases;
  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
  const width=c=>(aim==='max'?c.maxWidthMeters:c.fullWidthMeters);
  const depth=c=>(aim==='max'?c.maxLengthMeters:c.fullLengthMeters);
- // Independent stratified stage samples are illustrative, not recovered game RNG.
- const stages=r.contacts.map(c=>{
-  const ranks=Array.from({length:n},(_,i)=>i);
-  for(let i=n-1;i>0;i--){const j=Math.floor(random()*(i+1));[ranks[i],ranks[j]]=[ranks[j],ranks[i]]}
-  return ranks.map(rank=>({x:c.distanceMeters+(random()*2-1)*depth(c)/2,
-   z:((rank+random())/n*2-1)*width(c)/2}));
- });
+ // Replays support stable aircraft groups, not fixed ranks for every bomb.
+ // Each aircraft retains its lateral stratum; its bombs get fresh stage jitter.
+ // Equal strata and uniform within-stratum RNG are still empirical assumptions.
+ const ranks=Array.from({length:group.aircraft},(_,i)=>i);
+ for(let i=ranks.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[ranks[i],ranks[j]]=[ranks[j],ranks[i]]}
+ const stages=r.contacts.map(c=>Array.from({length:n},(_,i)=>({
+  x:c.distanceMeters+(random()*2-1)*depth(c)/2,
+  z:((ranks[Math.floor(i/perAircraft)]+random())/group.aircraft*2-1)*width(c)/2
+ })));
  const initialTime=r.initialTime,referenceDistance=r.contacts[0].distanceMeters;
  // The client uses the shared pack's squadronToTarget/fallTime for every bounce.
  // Per-bomb impact dispersion changes the initial fall path, not this reference.
@@ -34,7 +38,7 @@ function buildSalvo(row, aim, seed) {
    }
    elapsed+=time;
   }
-  return {contacts,points,arcs,duration:elapsed};
+  return {planeIndex:Math.floor(i/perAircraft),releaseIndex:Math.floor(i%perAircraft/group.projectilesPerRelease),projectileIndex:i%group.projectilesPerRelease,contacts,points,arcs,duration:elapsed};
  });
 }
 

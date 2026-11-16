@@ -10,6 +10,7 @@ function reconstructSkip(aircraft,weapon,name=aircraft.name){
  const sequence=weapon.SkipsSequence;
  const skips=weapon.skips||(Array.isArray(sequence?.order)?sequence.order.map(key=>{const s=sequence[key]||{};return [s.xSalvo,s.zSalvo,s.horizontalSpeedMultiplier,s.verticalSpeedMultiplier,s.angleMultiplier]}):null);
  if(!Array.isArray(skips)||!skips.length||skips.length>10||!skips.every(row=>Array.isArray(row)&&row.length===5&&row.every(positive)))throw Error('Skip projectile bounce inputs are unavailable');
+ for(const key of ['attackerSize','projectilesPerAttack','attackCount'])if(!Number.isInteger(aircraft[key]))throw Error('Invalid skip-bomber payload count: '+key);
  const bombs=aircraft.attackerSize*aircraft.projectilesPerAttack*aircraft.attackCount;
  if(!Number.isInteger(bombs)||bombs>4096)throw Error('Skip-bomber payload exceeds the supported limit');
  const gravity=10,toMap=30,height=aircraft.aimingHeight;
@@ -36,7 +37,7 @@ function reconstructSkip(aircraft,weapon,name=aircraft.name){
   arcs.push({startBW:distance,endBW:next,renderTime,renderPeakBW:vy*renderTime/4,points});
   distance=next;contacts.push(contact(distance,i+1,fx,fz));
  }
- const row={id:aircraft.name,name,aircraft:aircraft.name,bombs,skips,maxSkipAngleDeg:weapon.maxSkipAngle,
+ const row={id:aircraft.name,name,aircraft:aircraft.name,bombs,attackGroup:{aircraft:aircraft.attackerSize,projectilesPerRelease:aircraft.projectilesPerAttack,releases:aircraft.attackCount},skips,maxSkipAngleDeg:weapon.maxSkipAngle,
   result:{heightBW:height,heightMeters:height*toMap,speedKn:aircraft.speedMoveWithBomb,initialTime,initialAngleDeg:angle*180/Math.PI,contacts,arcs}};
  if(!Number.isFinite(distance)||arcs.some(a=>!positive(a.renderTime)||!Number.isFinite(a.renderPeakBW)))throw Error('Skip-bomber trajectory cannot be calculated');
  return row;

@@ -1,0 +1,49 @@
+{
+  "scope": "Aggregate replay observations only; no raw replay, player identity or absolute coordinates. Immelmann probable partial-aim salvo excluded. Fixed aircraft strata are empirical, not exact recovered server RNG.",
+  "cases": [
+    {
+      "name": "WoWS Bearn",
+      "game": "WOWS",
+      "version": "15.10",
+      "aircraft": "PFAL501_Bearn_stock",
+      "weapon": "PFPS001_BEARN_STOCK",
+      "salvos": 20,
+      "planes": 2,
+      "bombsPerPlane": 2,
+      "lateralCorrelation": 0.7543070008060891
+    },
+    {
+      "name": "WoWS Immelmann",
+      "game": "WOWS",
+      "version": "15.10",
+      "aircraft": "PGAL952_M_IMMELMANN_STOCK",
+      "weapon": "PGPS952_M_IMMELMANN_STOCK",
+      "salvos": 26,
+      "planes": 4,
+      "bombsPerPlane": 1,
+      "lateralCorrelation": 0.9504978635710405
+    },
+    {
+      "name": "WoWS Shinano",
+      "game": "WOWS",
+      "version": "15.10",
+      "aircraft": "PJAL910_SHINANO",
+      "weapon": "PJPS209_SHINANO",
+      "salvos": 23,
+      "planes": 4,
+      "bombsPerPlane": 1,
+      "lateralCorrelation": 0.94851797106408
+    },
+    {
+      "name": "Korabli Nakhimov",
+      "game": "KORABLI",
+      "version": "26.11",
+      "aircraft": "PRAL902_A_NAKHIMOV_TOP",
+      "weapon": "PRPS006_A_NAKHIMOV_TOP",
+      "salvos": 11,
+      "planes": 7,
+      "bombsPerPlane": 1,
+      "lateralCorrelation": 0.9839400634162396
+    }
+  ]
+}

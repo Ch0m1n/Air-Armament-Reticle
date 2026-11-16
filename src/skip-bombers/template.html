@@ -91,7 +91,7 @@ function syncShip(){
  state.target=r.contacts[1].distanceMeters;state.center=state.target;snapped=null;
  $('targetPosition').value=Math.round(state.target);
  const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- $('facts').innerHTML=`<span><strong>${safe(row.name)}</strong></span><span>Aircraft: <strong>${r.speedKn} kn</strong></span><span>Release height: <strong>${fmt(r.heightMeters)} m</strong></span><span>Attack group: <strong>${row.bombs} bombs</strong></span><span><strong>${r.contacts.length} contact lines</strong></span><span>${safe(row.note||(row.id==='Nakhimov'?'Top aircraft module':'Baseline aircraft module'))}</span>`;
+ $('facts').innerHTML=`<span><strong>${safe(row.name)}</strong></span><span>Aircraft: <strong>${r.speedKn} kn</strong></span><span>Release height: <strong>${fmt(r.heightMeters)} m</strong></span><span>Attack group: <strong>${row.attackGroup.aircraft} aircraft × ${row.attackGroup.projectilesPerRelease*row.attackGroup.releases} bombs (${row.bombs} total)</strong></span><span><strong>${r.contacts.length} contact lines</strong></span><span>${safe(row.note||(row.id==='Nakhimov'?'Top aircraft module':'Baseline aircraft module'))}</span>`;
  $('rows').innerHTML=r.contacts.map(c=>`<tr><td>C${c.stage}${c.stage===0?' · first contact':''}</td><td>${c.distanceMeters.toFixed(1)} m</td><td>${c.fullWidthMeters.toFixed(1)} m</td><td>${c.maxWidthMeters.toFixed(1)} m</td><td>${c.fullLengthMeters.toFixed(1)} m</td></tr>`).join('');
  state.progress=0;$('time').value=0;schedule();
 }
