@@ -10,6 +10,8 @@ let engine=source.match(/<script>([\s\S]*?)<\/script>/)[1].split('// UI')[0];
 const image=engine.match(/const YAMATO_IMAGE = 'data:image\/png;base64,([^']+)'/);
 if(!image)throw Error('Missing reference image');
 engine=engine.replace(image[0],"const YAMATO_IMAGE = './assets/yamato.png'");
+const rocketKernel=fs.readFileSync(path.join(root,'src/rockets/model.js'),'utf8');
+if(engine.slice(engine.indexOf('function rocketReleasePlan('),engine.indexOf('function analyzeAttack('))!==rocketKernel)throw Error('Rocket kernel differs from canonical src/rockets/model.js');
 const out=path.resolve(root,'dist');
 if(path.dirname(out)!==root||path.basename(out)!=='dist')throw Error('Invalid build output');
 if(fs.existsSync(out)) {

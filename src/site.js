@@ -53,7 +53,7 @@ ui('results').addEventListener('input',event=>{
   const seconds=Number(event.target.value);
   pauseSkipTransport();skipTransport.linked=true;skipTransport.seconds=Math.max(0,Math.min(skipEndTime(),seconds));applySkipTime();
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseSkipTransport()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pauseSkipTransport();pauseBomberPreviews()}});
 function updateSkipSharedScale(){
   const frames=[...document.querySelectorAll('iframe[data-skip-id]')];
   const requests=frames.map(f=>skipScaleRequests.get(Number(f.dataset.skipId))).filter(Boolean);
@@ -211,8 +211,8 @@ function defaultEntries(){return activeGame==='mixed'?actualGames.flatMap(game=>
 const dimension=value=>value?`${Number(value.width.toFixed(1))} × ${Number(value.height.toFixed(1))} m`:'N/A';
 function comparisonMetrics(item) {
   const source=activeGame==='mixed'&&item.version?[['Version',item.version]]:[];
-  if(item.kind==='attack')return [...source,['Minimum aim (estimate)',dimension(item.aimMinimum)],['Maximum aim (estimate)',dimension(item.outer)],['Length validation','Unverified'],['Model','Salvo x spread (experimental)']];
-  if(item.kind==='bomb')return [...source,['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation',item.innerPercentage==null?'N/A':item.innerPercentage+'%']];
+  if(item.kind==='attack')return [...source,['Minimum aim (estimate)',dimension(item.aimMinimum)],['Maximum aim (estimate)',dimension(item.outer)],['Rockets per attack',item.raw.attackerSize*item.raw.projectilesPerAttack*item.raw.attackCount],['Aircraft × payload × releases',`${item.raw.attackerSize} × ${item.raw.projectilesPerAttack} × ${item.raw.attackCount}`],['Inner quota',item.innerPercentage+'%'],['Nominal interval',item.raw.attackInterval+' s'],['Model','Replay-informed assignment · estimated density']];
+  if(item.kind==='bomb')return [...source,['Attack group',`${item.raw.attackerSize} aircraft × ${item.raw.projectilesPerAttack*item.raw.attackCount} bombs`],['Minimum aim',dimension(item.aimMinimum)],['Maximum aim',dimension(item.outer)],['Inner region',dimension(item.aimInner)],['Inner allocation (estimate)',item.innerPercentage==null?'N/A':item.innerPercentage+'%'],['Release interval',item.raw.attackInterval+' s'],['Model','Replay-informed assignment · estimated spread']];
   if(item.kind==='torpedo'){
     const sector=torpedoSector(item);
     return [...source,['Torpedoes per attack',item.total],['Range',item.rangeDistance==null?'N/A':Number((item.rangeDistance/1000).toFixed(2))+' km'],['Arming distance',item.armingDistance==null?'N/A':Math.round(item.armingDistance)+' m'],['Formation width (estimate)',sector?Number(sector.startWidth.toFixed(1))+' m':'N/A'],['Full-aim width at reference distance',sector?`${Number(sector.aimWidth.toFixed(1))} m / ${Number((sector.aimDistance/1000).toFixed(2))} km`:'N/A'],['Formation rows',item.rows]];
@@ -226,11 +226,45 @@ function sourceData(item) {
   }).join('');
   return `<p>${escapeHtml(item.filename)}</p><p>${escapeHtml(item.projectile||'Weapon reference unavailable')}</p>`;
 }
+// Release-only playback: these markers are planned impact positions, not airborne bombs.
+let bomberPreviewFrame=null;
+const bomberPreviews=new Map();
+function pauseBomberPreviews(){
+  if(bomberPreviewFrame!==null)cancelAnimationFrame(bomberPreviewFrame);
+  bomberPreviewFrame=null;bomberPreviews.clear();
+}
+function updateBomberPreview(item,time){
+  if(!item.attack)return;
+  item.attack.elapsed=Math.max(0,Math.min(item.attack.duration,time));
+  for(const marker of document.querySelectorAll(`[data-bomber-marker="${item.id}"]`))
+    marker.style.visibility=Number(marker.dataset.releaseTime)<=item.attack.elapsed+1e-9?'visible':'hidden';
+  for(const slider of document.querySelectorAll(`[data-bomber-time="${item.id}"]`))slider.value=String(item.attack.elapsed);
+  for(const output of document.querySelectorAll(`[data-bomber-clock="${item.id}"]`))output.textContent=item.attack.elapsed.toFixed(2)+' / '+item.attack.duration.toFixed(2)+' s';
+}
+function startBomberPreview(item){
+  if(!item.attack)return;
+  if(!item.attack.duration){updateBomberPreview(item,0);return;}
+  bomberPreviews.set(item.id,{item,started:performance.now()-item.attack.elapsed*1000});
+  if(bomberPreviewFrame!==null)return;
+  const tick=now=>{
+    bomberPreviewFrame=null;
+    for(const [id,preview] of bomberPreviews){
+      updateBomberPreview(preview.item,(now-preview.started)/1000);
+      if(preview.item.attack.elapsed>=preview.item.attack.duration)bomberPreviews.delete(id);
+    }
+    if(bomberPreviews.size)bomberPreviewFrame=requestAnimationFrame(tick);
+  };
+  bomberPreviewFrame=requestAnimationFrame(tick);
+}
+function bomberReleaseTools(item){
+  if(!item.attack?.points.length||!finite(item.attack.duration))return '';
+  return `<label class="bomber-release-control"><span>Time from first release</span><input type="range" data-bomber-time="${item.id}" min="0" max="${item.attack.duration}" step="0.001" value="${item.attack.elapsed??item.attack.duration}" aria-label="Time from first bomb release"${item.attack.duration?'':' disabled'}><output data-bomber-clock="${item.id}">${(item.attack.elapsed??item.attack.duration).toFixed(2)} / ${item.attack.duration.toFixed(2)} s</output></label>`;
+}
 function cardTools(item) {
   const id=item.id;
   return `<div class="reference-tools"><button type="button" data-action="reference" data-id="${id}" aria-pressed="${!!item.reference}" title="Yamato reference (263 × 38.9 m)"><img src="${YAMATO_IMAGE}" alt="">Yamato</button>
-    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:`<span class="range-modes" role="group" aria-label="Torpedo display range">${[['near','1 km'],['full','Full range']].map(([mode,label])=>`<button type="button" data-action="range-${mode}" data-id="${id}" aria-pressed="${torpedoFullRange===(mode==='full')}">${label}</button>`).join('')}</span>`}
-    ${['bomb','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${item.kind==='bomb'?'Simulate bomb drops':'Simulate airstrike'}" title="${item.kind==='bomb'?'Illustrative bomb drops; not game RNG':'Simulate airstrike'}"${item.kind==='bomb'?bomberPayload(item)&&bomberSimulationRegion(item).outer?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${glyph('Play')}</button><button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${item.kind==='bomb'?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${label}</button>`).join('')}</div>`:''}`;
+    ${item.kind!=='torpedo'?`<button type="button" data-action="rotate" data-id="${id}" title="Rotate Yamato" aria-label="Rotate Yamato"${item.reference?'':' disabled'}>${glyph('RotateCw')}</button>`:`<span class="range-modes" role="group" aria-label="Torpedo display range">${[['near','1 km'],['full','Full range']].map(([mode,label])=>`<button type="button" data-action="range-${mode}" data-id="${id}" aria-pressed="${torpedoFullRange===(mode==='full')}">${item.kind==='attack'&&mode==='immediate'?'Maximum spread':label}</button>`).join('')}</span>`}
+    ${['bomb','attack','airstrike'].includes(item.kind)?`<button type="button" data-action="play" data-id="${id}" aria-label="${['bomb','attack'].includes(item.kind)?'New salvo':'Simulate airstrike'}" title="${['bomb','attack'].includes(item.kind)?'New replay-informed release sample; probability model estimated':'Simulate airstrike'}"${['bomb','attack'].includes(item.kind)?(item.kind==='attack'?rocketReleasePlan(item):bomberReleasePlan(item))?'':' disabled':item.weaponVerified&&item.payload?'':' disabled'}>${['bomb','attack'].includes(item.kind)?'New salvo':glyph('Play')}</button>${['bomb','attack'].includes(item.kind)?`<button type="button" data-action="bomber-replay" data-id="${id}"${['bomber-release-v1','rocket-release-v1'].includes(item.attack?.model)&&finite(item.attack.duration)?'':' disabled'}>Replay</button>`:''}<button type="button" data-action="clear" data-id="${id}"${item.attack?.points.length?'':' disabled'}>Clear</button>`:''}</div>${['bomb','attack'].includes(item.kind)?`<div class="reference-tools" role="group" aria-label="Drop aiming state">${[['fully','Fully aimed'],['immediate','Immediate drop']].map(([mode,label])=>`<button type="button" data-action="aim-${mode}" data-id="${id}" aria-pressed="${(item.aimMode||'fully')===mode}">${item.kind==='attack'&&mode==='immediate'?'Maximum spread':label}</button>`).join('')}</div><div class="reference-tools" role="group" aria-label="Area display">${(item.kind==='attack'?[['aim','Aim-centered']]:[['aim','Aiming outline'],['swept','Combined releases']]).map(([view,label])=>`<button type="button" data-action="bomber-view-${view}" data-id="${id}" aria-pressed="${(item.envelopeView||'aim')===view}">${label}</button>`).join('')}</div>${bomberReleaseTools(item)}`:''}`;
 }
 function renderComparisonTabs() {
   ui('comparison-tabs').innerHTML=comparisonKinds().map(kind=>`<button type="button" id="comparison-tab-${kind}" role="tab" data-comparison-tab="${kind}" aria-controls="comparison-${kind}" aria-selected="${kind===comparisonRole}" tabindex="${kind===comparisonRole?0:-1}">${roleNames[kind]}<small>${selections.filter(item=>item.kind===kind).length}</small></button>`).join('');
@@ -250,6 +284,7 @@ ui('comparison-tabs').addEventListener('keydown',event=>{
   if(next!=null){event.preventDefault();selectComparisonRole(kinds[next],true);}
 });
 function renderComparison(focus=null) {
+  pauseBomberPreviews();
   pauseSkipTransport();
   saveSkipSessions();
   const positions=new Map(shipSlots.map((slot,index)=>[slot.id,index]));
@@ -598,20 +633,30 @@ function handleReticleClick(event){
   }
   if(button.disabled)return;
   const id=Number(button.dataset.id),item=selections.find(r=>r.id===id);if(!item)return;
-  const action=button.dataset.action;
+  const action=button.dataset.action;let bomberPreview=false;
   if(action==='expand'){openExpandedDrawing(id);return;}
   if(action==='remove'){if(item.slotId)removeSlot(item.slotId);else selections.splice(selections.indexOf(item),1);renderLibrary();renderComparison();return;}
   if(action==='reference')item.reference=!item.reference;
   else if(action==='range-near'||action==='range-full')torpedoFullRange=action==='range-full';
   else if(action==='rotate')item.rotation=((item.rotation||0)+90)%180;
   else if(action==='play'){
-    const points=item.kind==='bomb'?simulateBomber(item):simulateAirstrike(item);
-    if(!points.length){notice('Drop preview unavailable for these region or payload values.',true);return;}
-    item.attack={points,startedAt:Date.now()};notice('');
+    if(['bomb','attack'].includes(item.kind)){
+      const seed=crypto.getRandomValues(new Uint32Array(1))[0],salvo=item.kind==='attack'?buildRocketSalvo(item,seed):buildBomberSalvo(item,seed);
+      if(!salvo){notice('Release preview unavailable: check formation, aiming regions and payload.',true);return;}
+      item.attack={...salvo,elapsed:0};bomberPreview=true;
+    }else{
+      const points=simulateAirstrike(item);
+      if(!points.length){notice('Drop preview unavailable for these region or payload values.',true);return;}
+      item.attack={points,startedAt:Date.now()};
+    }
+    notice('');
   }
+  else if(action==='bomber-view-aim'||action==='bomber-view-swept')item.envelopeView=action==='bomber-view-swept'?'swept':'aim';
+  else if(action==='bomber-replay'){if(!['bomber-release-v1','rocket-release-v1'].includes(item.attack?.model)||!finite(item.attack.duration))return;item.attack.elapsed=0;bomberPreview=true;}
   else if(action==='aim-fully'||action==='aim-immediate'){item.aimMode=action==='aim-immediate'?'immediate':'fully';item.attack=null;}
   else if(action==='clear')item.attack=null;
   renderComparison({action,id});
+  if(bomberPreview)startBomberPreview(item);
   if(ui('drawing-dialog').open)ui('drawing-dialog').querySelector(`[data-action="${action}"]`)?.focus();
 }
 function handleReticleReset(event){
@@ -622,6 +667,12 @@ function handleReticleReset(event){
   input.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function handleReticleDistance(event){
+  const bomberInput=event.target.closest('[data-bomber-time]');
+  if(bomberInput){
+    const item=selections.find(r=>r.id===Number(bomberInput.dataset.bomberTime));
+    if(item?.attack){pauseBomberPreviews();updateBomberPreview(item,bomberInput.valueAsNumber)}
+    return;
+  }
   const input=event.target.closest('[data-distance]');if(!input)return;
   const item=selections.find(r=>r.id===Number(input.dataset.distance));if(!item)return;
   const range=Math.min(item.rangeDistance||commonDistance([item]),torpedoDistanceLimit());item.targetDistance=Math.max(0,Math.min(range,input.valueAsNumber));

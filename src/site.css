@@ -83,3 +83,6 @@ input,select{background:var(--input)}.app-header{background:var(--header)}.libra
 .ship-drag-preview{position:fixed;left:0;top:0;z-index:1000;box-sizing:border-box;pointer-events:none;transform-origin:top left;box-shadow:0 12px 30px #0003;will-change:transform}
 .range-modes{display:inline-flex;gap:0}.range-modes button{border-radius:0}.range-modes button+button{margin-left:-1px}.range-modes button:first-child{border-radius:3px 0 0 3px}.range-modes button:last-child{border-radius:0 3px 3px 0}
 .drawing-wrap .distance-control{right:8px;width:24px}.drawing-wrap .distance-control input{box-sizing:border-box;min-width:0;width:24px;max-width:100%;border:0;box-shadow:none}
+
+.bomber-release-control{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 10px;font-size:12px;color:var(--muted)}
+.bomber-release-control input{flex:1;min-width:80px;max-width:100%}.bomber-release-control output{font-variant-numeric:tabular-nums;white-space:nowrap}

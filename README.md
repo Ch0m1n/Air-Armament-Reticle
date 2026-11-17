@@ -29,6 +29,12 @@ The embedded renderer is built from `src/skip-bombers/` by
 
 **This skeleton includes no real Ship, Aircraft or Projectile JSON datasets.** Both game libraries start empty.
 
+Normal bombers now use a replay-informed release model: **New salvo** draws a new
+seeded sample, **Replay** retains it, and the release slider shows successive
+batches with aircraft colors. The swept areas and probability density are estimates;
+markers show planned impact positions, not airborne trajectories. See
+`src/bombers/NOTES.md` for evidence and the remaining Hakuryu discrepancy.
+
 ## Data Layout
 
 ```text
@@ -103,3 +109,7 @@ Calculations are estimates, not verified game RNG or ship hit probability. Terra
 The calculation/drawing core is extracted from the existing offline viewer in `src/viewer-source.html`; its old UI is not used. The independent site lives in `src/shell.html`, `src/site.css` and `src/site.js`. The Yamato reference bitmap is retained as a visual asset (263 x 38.9 m), not a Ship JSON dataset.
 
 This is an unofficial fan tool. Game-derived imagery belongs to its respective rights holders. Selected Lucide icons are vendored with their license in `src/vendor/lucide-LICENSE`. No third-party runtime scripts load from a CDN. The reference wows_ballistics project informed the interaction structure; its implementation was not copied.
+
+## Attack-aircraft release model
+
+Rocket cards use a shared replay-informed sampler: fresh lateral ordering per release, cumulative inner-region quota, seeded New salvo/Replay and a nominal release timeline. Dimensions use game-distance meters and the Yamato reference uses game scale x2. Center travel, flight paths and collisions are not simulated. Density and quota rounding remain estimates; theoretical maximum spread was not verified for Colossus. See `src/rockets/NOTES.md`. Rocket test fixtures contain game parameters and aggregate counts, with no replay/player/world-coordinate data.

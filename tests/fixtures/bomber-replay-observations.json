@@ -1,0 +1,53 @@
+{
+  "scope": "Aggregate WoWS 15.10 observations only. No raw replay, player identity or absolute coordinates. Sorted fresh release samples are an empirical candidate, not recovered server RNG.",
+  "cases": [
+    {
+      "ship": "midway",
+      "aircraft": "PAAD210_Midway_top",
+      "aircraftParamsId": 4074668016,
+      "attacks": 24,
+      "bombs": 144,
+      "bombsPerAttack": 6,
+      "releases": 2,
+      "lateralPlaneOrder": [
+        1,
+        0,
+        2
+      ],
+      "networkPacks": 48,
+      "overlappingAircraftRanges": 15
+    },
+    {
+      "ship": "hakuryu",
+      "aircraft": "PJAD110_Hakuryu_stock",
+      "aircraftParamsId": 4179525328,
+      "attacks": 18,
+      "bombs": 54,
+      "bombsPerAttack": 3,
+      "releases": 1,
+      "lateralPlaneOrder": [
+        1,
+        0,
+        2
+      ],
+      "networkPacks": 18,
+      "overlappingAircraftRanges": 0
+    },
+    {
+      "ship": "audacious",
+      "aircraft": "PBAD210_Audacious_top",
+      "aircraftParamsId": 4074667984,
+      "attacks": 18,
+      "bombs": 324,
+      "bombsPerAttack": 18,
+      "releases": 6,
+      "lateralPlaneOrder": [
+        1,
+        0,
+        2
+      ],
+      "networkPacks": 108,
+      "overlappingAircraftRanges": 18
+    }
+  ]
+}

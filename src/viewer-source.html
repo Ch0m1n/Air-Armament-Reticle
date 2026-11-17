@@ -253,18 +253,56 @@ function simulateAirstrike(r,random=Math.random) {
   }
   return points;
 }
+function rocketReleasePlan(r) {
+  const raw=r.raw,pair=v=>Array.isArray(v)&&v.length>=2&&v.slice(0,2).every(n=>Number.isFinite(n)&&n>0);
+  const values=[raw.attackerSize,raw.projectilesPerAttack,raw.attackCount];
+  if(!values.every(n=>Number.isInteger(n)&&n>0)||values.reduce((a,b)=>a*b,1)>512||!pair(raw.outerSalvoSize)||!pair(raw.innerSalvoSize)||!pair(raw.minSpread)||!pair(raw.maxSpread)||raw.minSpread.some((n,i)=>n>raw.maxSpread[i])||!Number.isFinite(raw.attackInterval)||raw.attackInterval<0)return null;
+  const formation=raw.formations?.attack?.[1];
+  if(!Array.isArray(formation)||formation.length<values[0]||!formation.slice(0,values[0]).every(p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)))return null;
+  const percentage=raw.innerBombsPercentage;
+  if(!Number.isFinite(percentage)||percentage<0||percentage>100)return null;
+  const spread=r.aimMode==='immediate'?raw.maxSpread:raw.minSpread;
+  const region=salvo=>({width:60*salvo[0]*spread[0],height:60*salvo[1]*spread[1]});
+  const outer=region(raw.outerSalvoSize),inner=region(raw.innerSalvoSize);
+  if(inner.width>outer.width||inner.height>outer.height||((inner.width===outer.width&&inner.height===outer.height)&&percentage<100))return null;
+  return {aircraft:values[0],projectilesPerRelease:values[1],releases:values[2],interval:raw.attackInterval,duration:(values[2]-1)*raw.attackInterval,outer,inner,percentage,
+    planeOrder:Array.from({length:values[0]},(_,i)=>i).sort((a,b)=>formation[a][0]-formation[b][0]||a-b)};
+}
+function buildRocketSalvo(r,seed) {
+  if(!Number.isInteger(seed)||seed<0||seed>0xffffffff)throw Error('Rocket seed must be uint32');
+  const plan=rocketReleasePlan(r);if(!plan)return null;
+  let state=seed;const random=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)/4294967296);
+  const sample=d=>{const radius=Math.sqrt(random()),angle=random()*Math.PI*2;return {x:Math.cos(angle)*radius*d.width/2,y:Math.sin(angle)*radius*d.height/2}};
+  const count=plan.aircraft*plan.projectilesPerRelease,points=[],releases=[];
+  for(let release=0;release<plan.releases;release++){
+    // Candidate cumulative quota, supported by these replays; native rounding remains unverified.
+    const quota=Math.round((release+1)*count*plan.percentage/100)-Math.round(release*count*plan.percentage/100),batch=[];
+    for(let i=0;i<count;i++){
+      let point=null;
+      if(i<quota)point=sample(plan.inner);
+      else for(let attempt=0;attempt<10000;attempt++){
+        const p=sample(plan.outer);
+        if((p.x/(plan.inner.width/2))**2+(p.y/(plan.inner.height/2))**2>1){point=p;break;}
+      }
+      if(!point)return null;
+      batch.push({...point,inner:i<quota});
+    }
+    batch.sort((a,b)=>a.x-b.x);
+    const time=release*plan.interval;
+    batch.forEach((p,i)=>points.push({...p,planeIndex:plan.planeOrder[Math.floor(i/plan.projectilesPerRelease)],projectileIndex:i%plan.projectilesPerRelease,releaseIndex:release,releaseTime:time,releaseCenter:0}));
+    releases.push({index:release,time,center:0,inner:quota,count});
+  }
+  return {model:'rocket-release-v1',seed,aim:r.aimMode||'fully',attackGroup:{aircraft:plan.aircraft,projectilesPerRelease:plan.projectilesPerRelease,releases:plan.releases},duration:plan.duration,points,releases};
+}
 function analyzeAttack(result) {
   const raw=result.raw;
-  if(!pair(raw.outerSalvoSize)||!pair(raw.minSpread)||!pair(raw.maxSpread)||raw.minSpread.some((n,i)=>n>raw.maxSpread[i]))throw Error('Rocket outline requires positive salvo and consistent two-axis spread inputs.');
-  // Width scale is an empirical fit to the supplied fully aimed Roosevelt/Colossus captures.
-  // Longitudinal geometry is provisional; do not reuse bomber release-travel offsets.
-  const ellipse=spread=>({width:30*raw.outerSalvoSize[0]*spread[0],height:30*raw.outerSalvoSize[1]*spread[1]});
-  result.kind='attack';result.geometryModel='rocket-salvo-v1';
-  result.outer=ellipse(raw.maxSpread);result.aimMinimum=ellipse(raw.minSpread);
-  if(![result.outer.width,result.outer.height,result.aimMinimum.width,result.aimMinimum.height].every(positive))throw Error('Invalid rocket outline dimensions.');
-  result.inner=null;result.aimInner=null;result.innerPercentage=null;
-  result.warnings.push('Experimental rocket width = 30 x outerSalvoSize X x spread X. Initial full-aim calibration uses supplied Roosevelt and Colossus screenshots; maximum-width spot checks include Roosevelt, Graf Zeppelin, Saipan and Aquila relative to Yamato. This is not verified client code or a guarantee for other versions.');
-  result.warnings.push('Length is schematic: 30 x outerSalvoSize Y x spread Y. The supplied full-outline Aquila capture has a similar aspect ratio, but perspective and visual measurement uncertainty prevent universal length validation. Bomber release-travel offsets, inner allocation, launch timing and rocket trajectories are not modeled.');
+  if(!rocketReleasePlan(result))throw Error('Rocket preview requires valid formation, payload, inner/outer regions and spread.');
+  const region=(salvo,spread)=>({width:60*salvo[0]*spread[0],height:60*salvo[1]*spread[1]});
+  result.kind='attack';result.geometryModel='rocket-release-v1';result.offset=0;
+  result.outer=region(raw.outerSalvoSize,raw.maxSpread);result.aimMinimum=region(raw.outerSalvoSize,raw.minSpread);
+  result.inner=region(raw.innerSalvoSize,raw.maxSpread);result.aimInner=region(raw.innerSalvoSize,raw.minSpread);result.innerPercentage=raw.innerBombsPercentage;
+  result.warnings.push('Replay-informed lateral assignment and cumulative inner quota. Probability density and native quota rounding remain estimates. Maximum spread is theoretical; Colossus maximum aiming was not verified.');
+  result.warnings.push('Aim-centered releases: center travel, flight paths and damage are not simulated. Timeline uses nominal release intervals, not impact times. Dimensions use game-distance meters; Yamato uses game scale ×2.');
   return result;
 }
 function analyze(input, filename, weapon=null) {
@@ -309,25 +347,25 @@ function analyze(input, filename, weapon=null) {
     const ratio = raw.maxSpread[1]/raw.maxSpread[0];
     const offsetRaw = 2.69*raw.speedMoveWithBomb*(raw.attackCount-1)*raw.attackInterval;
     result.offset = Math.round(offsetRaw); result.offsetRaw = offsetRaw; result.ratio = ratio;
-    function ellipse(salvo) {
-      if (!pair(salvo)) return null;
-      const width = Math.round(60*salvo[0]), baseHeight = Math.round(60*ratio*salvo[1]);
-      const height = baseHeight+result.offset;
-      if (![width,height].every(positive)) throw Error('Invalid calculated ellipse dimensions.');
+    // Apply spread on its own axis, as in the recovered bombing-zone calculation.
+    // Full-strength baseline; no inverse maximum-spread normalization or fitted ship factors.
+    function ellipse(salvo,spread) {
+      if(!pair(salvo)||!pair(spread))return null;
+      const width=60*salvo[0]*spread[0],baseHeight=60*salvo[1]*spread[1];
+      const height=baseHeight+result.offset;
+      if(![width,height].every(positive))throw Error('Invalid calculated release area');
       return {width,height,baseHeight,salvo:salvo.slice(0,2)};
     }
-    result.outer = ellipse(raw.outerSalvoSize);
-    result.inner = ellipse(raw.innerSalvoSize || raw.reticleSize || raw.reticleSizeMax);
-    result.aimMinimum = pair(raw.minSpread) && raw.minSpread.every((v,i)=>v<=raw.maxSpread[i]) && result.outer
-      ? {width:result.outer.width*raw.minSpread[0]/raw.maxSpread[0],height:result.outer.baseHeight*raw.minSpread[1]/raw.maxSpread[1]+result.offset}
-      : null;
-    result.aimInner = result.aimMinimum && result.inner
-      ? {width:result.inner.width*raw.minSpread[0]/raw.maxSpread[0],height:result.inner.baseHeight*raw.minSpread[1]/raw.maxSpread[1]+result.offset}
-      : null;
+    const innerSalvo=raw.innerSalvoSize||raw.reticleSize||raw.reticleSizeMax;
+    result.outer=ellipse(raw.outerSalvoSize,raw.maxSpread);
+    result.inner=ellipse(innerSalvo,raw.maxSpread);
+    const minimum=pair(raw.minSpread)&&raw.minSpread.every((v,i)=>v<=raw.maxSpread[i])?raw.minSpread:null;
+    result.aimMinimum=ellipse(raw.outerSalvoSize,minimum);
+    result.aimInner=ellipse(innerSalvo,minimum);
     if(!result.aimMinimum)result.warnings.push('Minimum aiming outline unavailable: missing or inconsistent minSpread.');
     result.innerPercentage = finite(raw.innerBombsPercentage) && raw.innerBombsPercentage>=0 && raw.innerBombsPercentage<=100 ? raw.innerBombsPercentage : null;
-    result.warnings.push('MKtool estimate, not an independently verified in-game formula.');
-    result.warnings.push('Raw file only: aiming state, maneuvering and build effects are not simulated.');
+    result.warnings.push('Data-scaled full-strength release areas. Replay-informed aircraft assignment; exact server probability density and inner allocation remain unverified.');
+    result.warnings.push('Nominal release timing and swept travel estimate. Airborne trajectories, actual aim accuracy, maneuvering and build effects are not reconstructed.');
     if (/skip/i.test(raw.name || '') || raw.typeinfo?.species === 'Skip') result.warnings.push('Skip-bomber geometry may differ; this generic bomb estimate is not validated for skip bombers.');
     return result;
   }
@@ -354,7 +392,7 @@ function airstrikeDrawing(r,extent=Math.max(r.outer.width,r.outer.height,r.refer
   if(!r.weaponVerified)return `<svg viewBox="0 0 300 240" role="img" aria-label="Airstrike weapon verification"><text x="150" y="112" text-anchor="middle">${r.excluded?'ASW / unsupported weapon excluded':'Load the required bomb Projectile JSON'}</text></svg>`;
   const scale=160/extent,w=r.outer.width*scale,h=r.outer.height*scale,l=150-w/2,t=112-h/2,right=150+w/2,bottom=112+h/2;
   const elapsed=r.attack?Date.now()-r.attack.startedAt:0;
-  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="Experimental airstrike area"><text x="150" y="18" text-anchor="middle">Airstrike · ship-scale estimate</text><path class="airstrike-outline" d="M ${l+w/4} ${t} H ${l} V ${t+h/4} M ${right-w/4} ${t} H ${right} V ${t+h/4} M ${l} ${bottom-h/4} V ${bottom} H ${l+w/4} M ${right} ${bottom-h/4} V ${bottom} H ${right-w/4}"/>${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${r.inner?`<rect class="ellipse-distribution" x="${150-r.inner.width*scale/2}" y="${112-r.inner.height*scale/2}" width="${r.inner.width*scale}" height="${r.inner.height*scale}" rx="${r.inner.width*scale/2}" ry="${r.inner.baseHeight*scale/2}"/>`:''}${(r.attack?.points||[]).map(p=>`<circle class="airstrike-drop" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.2" style="animation-delay:${Math.round(p.time*1000-elapsed)}ms"/>`).join('')}<text x="150" y="218" text-anchor="middle">${r.outer.width} × ${r.outer.height} m${r.reference?' · Yamato: 263 m':''}</text><text x="150" y="234" text-anchor="middle">Red: inner-region estimate · not hit probability</text></svg>`;
+  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="Experimental airstrike area"><text x="150" y="18" text-anchor="middle">Airstrike · ship-scale estimate</text><path class="airstrike-outline" d="M ${l+w/4} ${t} H ${l} V ${t+h/4} M ${right-w/4} ${t} H ${right} V ${t+h/4} M ${l} ${bottom-h/4} V ${bottom} H ${l+w/4} M ${right} ${bottom-h/4} V ${bottom} H ${right-w/4}"/>${r.reference?yamatoDrawing(150,112,scale*(r.kind==='attack'?2:1),r.rotation||0):''}${r.inner?`<rect class="ellipse-distribution" x="${150-r.inner.width*scale/2}" y="${112-r.inner.height*scale/2}" width="${r.inner.width*scale}" height="${r.inner.height*scale}" rx="${r.inner.width*scale/2}" ry="${r.inner.baseHeight*scale/2}"/>`:''}${(r.attack?.points||[]).map(p=>`<circle class="airstrike-drop" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.2" style="animation-delay:${Math.round(p.time*1000-elapsed)}ms"/>`).join('')}<text x="150" y="218" text-anchor="middle">${r.outer.width} × ${r.outer.height} m${r.reference?' · Yamato: 263 m':''}</text><text x="150" y="234" text-anchor="middle">Red: inner-region estimate · not hit probability</text></svg>`;
 }
 function targetDistance(r,distanceScale) {
   return Math.max(0,Math.min(distanceScale,finite(r.targetDistance)?r.targetDistance:Math.min(distanceScale,r.armingDistance||distanceScale*.3)));
@@ -365,7 +403,7 @@ function rocketViewDimensions(r) {
 function commonRocketScale(items) {
   const bounds=items.map(r=>{
     const d=rocketViewDimensions(r),rotated=!!r.rotation;
-    return {width:Math.max(d.width,r.reference?(rotated?263:38.9):0),height:Math.max(d.height,r.reference?(rotated?38.9:263):0)};
+    return {width:Math.max(d.width,r.reference?(rotated?526:77.8):0),height:Math.max(d.height,r.reference?(rotated?77.8:526):0)};
   });
   return Math.min(260/Math.max(1,...bounds.map(b=>b.width)),160/Math.max(1,...bounds.map(b=>b.height)));
 }
@@ -375,12 +413,19 @@ function bombDrawing(r,extent=null,rocketScale=null) {
   const rotated=!!r.rotation;
   const scale=r.kind==='attack'?(positive(rocketScale)?rocketScale:commonRocketScale([r])):positive(extent)?160/extent:Math.min(210/Math.max(...dimensions.map(d=>d.width),r.reference?(rotated?263:38.9):0),160/Math.max(...dimensions.map(d=>d.height),r.reference?(rotated?38.9:263):0));
   const d=r.aimMinimum;
-  const maximum=r.outer?`<ellipse class="ellipse-maximum" cx="150" cy="112" rx="${r.outer.width*scale/2}" ry="${r.outer.height*scale/2}"/>`:'';
-  const minimum=d?`<ellipse class="ellipse-outer" cx="150" cy="112" rx="${d.width*scale/2}" ry="${d.height*scale/2}"/>`:'';
-  const region=r.kind==='attack'?null:bomberSimulationRegion(r).inner;
-  const inner=region?`<ellipse class="ellipse-distribution" cx="150" cy="112" rx="${region.width*scale/2}" ry="${region.height*scale/2}"/>`:'';
-  const drops=(r.attack?.points||[]).map(p=>`<circle class="bomber-drop" fill="#da633e" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.5"/>`).join('');
-  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="${r.kind==='attack'?'Experimental width-calibrated rocket outlines; length unverified':'Estimated minimum and maximum aiming outlines and illustrative bomb drops'}"><text x="150" y="18" text-anchor="middle">${r.kind==='attack'?'Rocket aim · width-calibrated estimate':'Aiming outline estimate'}</text>${maximum}${minimum}${r.reference?yamatoDrawing(150,112,scale,r.rotation||0):''}${inner}${drops}<text x="150" y="218" text-anchor="middle">Minimum: green · Maximum: dashed amber</text><text x="150" y="234" text-anchor="middle">${r.kind==='attack'?'Length schematic · no release-travel offset':r.attack?.points.length?`${r.attack.points.length} illustrative drops · not game RNG`:region?`Inner: dashed red${r.innerPercentage==null?'':` · ${r.innerPercentage}% of bombs`}`:'Inner region unavailable'}</text></svg>`;
+  const travel=r.kind==='bomb'&&r.raw.attackCount>1?r.offset:0;
+  const outline=(value,className)=>r.kind==='bomb'&&r.envelopeView==='swept'?bomberEnvelopePath(value,travel,scale,className):value?`<ellipse class="${className}" cx="150" cy="112" rx="${value.width*scale/2}" ry="${value.height*scale/2}"/>`:'';
+  const maximum=outline(r.outer,'ellipse-maximum'),minimum=outline(d,'ellipse-outer');
+  const region=bomberSimulationRegion(r).inner;
+  const inner=outline(region,'ellipse-distribution');
+  const palette=['#d9842c','#2864b7','#189688','#9555ac','#b54c74','#6c8339'];
+  const drops=(r.attack?.points||[]).map(p=>{
+    const grouped=['bomb','attack'].includes(r.kind)&&Number.isInteger(p.planeIndex);
+    const visible=!grouped||p.releaseTime<=(r.attack.elapsed??r.attack.duration)+1e-9;
+    return `<circle class="bomber-drop" data-bomber-marker="${Number(r.id)||0}" data-release-time="${p.releaseTime??0}" fill="${grouped?palette[p.planeIndex%palette.length]:'#da633e'}" cx="${150+p.x*scale}" cy="${112+p.y*scale}" r="2.5" style="fill:${grouped?palette[p.planeIndex%palette.length]:'#da633e'};visibility:${visible?'visible':'hidden'}"><title>${grouped?`Aircraft ${p.planeIndex+1} · release ${p.releaseIndex+1} · ${p.releaseTime.toFixed(3)} s`:'Illustrative drop'}</title></circle>`;
+  }).join('');
+  const footer=r.kind==='attack'?'Aim-centered · nominal release times':r.kind==='bomb'?'Color: aircraft · release positions, not flight paths':r.attack?.points.length?`${r.attack.points.length} illustrative drops · not game RNG`:region?`Inner: dashed red${r.innerPercentage==null?'':` · ${r.innerPercentage}% of bombs`}`:'Inner region unavailable';
+  return `<svg viewBox="0 0 300 240" role="img" data-metric-scale="${scale}" aria-label="${r.kind==='attack'?'Aim-centered rocket distribution; estimated density':r.kind==='bomb'?'Estimated swept release areas and replay-informed aircraft assignments':'Estimated aiming areas and illustrative bomb drops'}"><text x="150" y="18" text-anchor="middle">${r.kind==='attack'?'Rocket dispersion · replay-informed estimate':r.kind==='bomb'?(r.envelopeView==='swept'?'Combined releases · estimate':'Aiming outline · estimate'):'Aiming outline estimate'}</text>${maximum}${minimum}${r.reference?yamatoDrawing(150,112,scale*(r.kind==='attack'?2:1),r.rotation||0):''}${inner}${drops}<text x="150" y="218" text-anchor="middle">Minimum: green · Maximum: dashed amber</text><text x="150" y="234" text-anchor="middle">${footer}</text></svg>`;
 }
 function bomberPayload(r) {
   const values=[r.raw.attackerSize,r.raw.projectilesPerAttack,r.raw.attackCount];
@@ -389,23 +434,66 @@ function bomberPayload(r) {
 function bomberSimulationRegion(r) {
   return {outer:r.aimMode==='immediate'?r.outer:r.aimMinimum,inner:r.aimMode==='immediate'?r.inner:r.aimInner};
 }
-function simulateBomber(r,random=Math.random) {
-  const count=bomberPayload(r),{outer,inner}=bomberSimulationRegion(r);
-  if(!count||!outer||!positive(outer.width)||!positive(outer.height))return [];
-  const split=inner&&positive(inner.width)&&positive(inner.height)&&inner.width<=outer.width&&inner.height<=outer.height&&finite(r.innerPercentage)&&r.innerPercentage>=0&&r.innerPercentage<=100;
+// Replay-informed assignment and release schedule; the probability density remains illustrative.
+function bomberReleasePlan(r) {
+  const raw=r.raw,count=bomberPayload(r),{outer,inner}=bomberSimulationRegion(r);
+  if(!count||!outer||!positive(outer.width)||!positive(outer.height)||raw.isLineBomber||raw.isMeshEllipseBomber)return null;
+  const formation=raw.formations?.attack?.[1],planes=raw.attackerSize;
+  if(!Array.isArray(formation)||formation.length<planes||!formation.slice(0,planes).every(p=>Array.isArray(p)&&p.length===3&&p.every(finite)))return null;
+  if(!finite(raw.attackInterval)||raw.attackInterval<0||!finite(r.offset)||r.offset<0)return null;
+  const travel=raw.attackCount>1?r.offset:0;
+  const region=d=>d&&positive(d.width)&&positive(d.height-travel)?{width:d.width,height:d.height-travel}:null;
+  const releaseOuter=region(outer),releaseInner=region(inner);
+  if(!releaseOuter)return null;
+  const planeOrder=Array.from({length:planes},(_,i)=>i).sort((a,b)=>formation[a][0]-formation[b][0]||a-b);
+  return {aircraft:planes,projectilesPerRelease:raw.projectilesPerAttack,releases:raw.attackCount,
+    interval:raw.attackInterval,duration:(raw.attackCount-1)*raw.attackInterval,travel,
+    outer:releaseOuter,inner:releaseInner,planeOrder};
+}
+function sampleBomberSalvo(r,random) {
+  const plan=bomberReleasePlan(r);if(!plan)return null;
+  const {outer,inner}=plan;
+  const split=inner&&inner.width<=outer.width&&inner.height<=outer.height&&
+    (inner.width<outer.width||inner.height<outer.height)&&finite(r.innerPercentage)&&r.innerPercentage>=0&&r.innerPercentage<=100;
   const sample=ellipse=>{const radius=Math.sqrt(random()),angle=random()*Math.PI*2;return {x:Math.cos(angle)*radius*ellipse.width/2,y:Math.sin(angle)*radius*ellipse.height/2};};
-  const points=[];
-  for(let i=0;i<count;i++){
-    let point=null;
-    if(split&&random()*100<r.innerPercentage)point=sample(inner);
-    else for(let attempt=0;attempt<256;attempt++){
-      const candidate=sample(outer);
-      if(!split||(candidate.x/(inner.width/2))**2+(candidate.y/(inner.height/2))**2>1){point=candidate;break;}
+  const points=[],releases=[];
+  for(let release=0;release<plan.releases;release++){
+    const center=plan.releases===1?0:plan.travel*(.5-release/(plan.releases-1));
+    const time=release*plan.interval,batch=[];
+    for(let i=0;i<plan.aircraft*plan.projectilesPerRelease;i++){
+      let point=null;
+      if(split&&random()*100<r.innerPercentage)point=sample(inner);
+      else for(let attempt=0;attempt<4096;attempt++){
+        const candidate=sample(outer);
+        if(!split||(candidate.x/(inner.width/2))**2+(candidate.y/(inner.height/2))**2>1){point=candidate;break;}
+      }
+      if(!point)return null;
+      batch.push(point);
     }
-    if(!point)return [];
-    points.push(point);
+    // Sort a fresh batch, never reserve exclusive aircraft bands across releases.
+    batch.sort((a,b)=>a.x-b.x);
+    batch.forEach((point,index)=>points.push({...point,y:point.y+center,
+      planeIndex:plan.planeOrder[Math.floor(index/plan.projectilesPerRelease)],
+      projectileIndex:index%plan.projectilesPerRelease,releaseIndex:release,releaseTime:time,releaseCenter:center}));
+    releases.push({index:release,time,center,bombs:batch.length});
   }
-  return points;
+  return {model:'bomber-release-v1',aim:r.aimMode||'fully',attackGroup:{aircraft:plan.aircraft,
+    projectilesPerRelease:plan.projectilesPerRelease,releases:plan.releases},duration:plan.duration,releases,points};
+}
+function buildBomberSalvo(r,seed) {
+  if(!Number.isInteger(seed)||seed<0||seed>0xffffffff)throw Error('Bomber seed must be an unsigned 32-bit integer');
+  let state=seed;
+  const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296};
+  const salvo=sampleBomberSalvo(r,random);return salvo?{...salvo,seed}:null;
+}
+function simulateBomber(r,random=Math.random) {
+  return sampleBomberSalvo(r,random)?.points||[];
+}
+function bomberEnvelopePath(d,travel,scale,className) {
+  if(!d)return '';
+  const rx=d.width*scale/2,ry=(d.height-travel)*scale/2,half=travel*scale/2;
+  if(!(rx>0&&ry>0))return '';
+  return `<path class="${className}" d="M ${150-rx} ${112-half} A ${rx} ${ry} 0 0 1 ${150+rx} ${112-half} L ${150+rx} ${112+half} A ${rx} ${ry} 0 0 1 ${150-rx} ${112+half} Z"/>`;
 }
 function torpedoDrawing(r,scale,distanceScale=commonDistance([r]),distanceLimit=Infinity) {
   const minX=Math.min(...r.points.map(p=>p.x)),maxX=Math.max(...r.points.map(p=>p.x));

@@ -123,14 +123,14 @@ test('attack aircraft require verified rocket identity; skip geometry remains ex
   assert.throws(()=>core.analyze({...plane,typeinfo:{...plane.typeinfo,species:'Skip'}},'skip.json'),/Skip-bomber/);
   const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
   const attack=core.analyze({...plane,bombName:'TEST_ROCKET'},'attack.json',weapon);
-  assert.equal(attack.kind,'attack');assert(attack.warnings.some(w=>w.includes('not verified client code')));
+  assert.equal(attack.kind,'attack');assert(attack.warnings.some(w=>w.includes('rounding remain estimates')));
   const explicit=core.analyze({...plane,bombName:null,rocketName:'TEST_ROCKET'},'attack.json',weapon);
   assert.equal(explicit.kind,'attack');
   assert.throws(()=>core.analyze({...plane,rocketName:'OTHER'},'attack.json',weapon),/matching Rocket/);
-  assert(core.bombDrawing(attack).includes('Length schematic'));
-  assert(!core.bombDrawing(attack).includes('ellipse-distribution'));
+  assert(core.bombDrawing(attack).includes('Aim-centered'));
+  assert(core.bombDrawing(attack).includes('ellipse-distribution'));
   const changed=core.modifiedInputs('attack',attack.raw,weapon,{'aircraft:outerSalvoSize:0':4});
-  assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,240);
+  assert.equal(core.analyze(changed.aircraft,'attack.json',weapon).outer.width,480);
 });
 
 test('strike references exclude consumable fighters and spotters without excluding cruiser attack squadrons',()=>{
@@ -158,17 +158,17 @@ test('skip records retain matching dependencies without invoking any geometry',(
 
 test('rocket salvo geometry is independent of bomber movement and inverse maximum-spread scaling',()=>{
   const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket',typeinfo:{species:'Rocket'}};
-  const raw={name:'TEST_ATTACK',bombName:weapon.name,outerSalvoSize:[6,4],minSpread:[1,0.7],maxSpread:[4,2.8],speedMoveWithBomb:124,attackCount:26,attackInterval:0.03};
+  const raw={name:'TEST_ATTACK',bombName:weapon.name,attackerSize:1,projectilesPerAttack:1,innerSalvoSize:[1,1],innerBombsPercentage:50,formations:{attack:[null,[[0,0,0]]]},outerSalvoSize:[6,4],minSpread:[1,0.7],maxSpread:[4,2.8],speedMoveWithBomb:124,attackCount:26,attackInterval:0.03};
   const first=core.analyze(raw,'attack.json',weapon);
-  assert.equal(first.aimMinimum.width,180);assert.equal(first.aimMinimum.height,84);
-  assert.equal(first.outer.width,720);assert.equal(first.outer.height,336);
+  assert.equal(first.aimMinimum.width,360);assert.equal(first.aimMinimum.height,168);
+  assert.equal(first.outer.width,1440);assert.equal(first.outer.height,672);
   const moved=core.analyze({...raw,speedMoveWithBomb:999,attackCount:50,attackInterval:1},'attack.json',weapon);
   assert.equal(moved.aimMinimum.height,first.aimMinimum.height);
   const widerMax=core.analyze({...raw,maxSpread:[8,5.6]},'attack.json',weapon);
   assert.equal(widerMax.aimMinimum.width,first.aimMinimum.width);
   assert.equal(widerMax.outer.width,first.outer.width*2);
-  assert.throws(()=>core.analyze({...raw,minSpread:[5,1]},'attack.json',weapon),/consistent/);
-  assert.throws(()=>core.analyze({...raw,outerSalvoSize:[0,1]},'attack.json',weapon),/positive/);
+  assert.throws(()=>core.analyze({...raw,minSpread:[5,1]},'attack.json',weapon),/valid formation/);
+  assert.throws(()=>core.analyze({...raw,outerSalvoSize:[0,1]},'attack.json',weapon),/valid formation/);
   const fields=core.modifierFields('attack',raw,weapon);
   assert.equal(fields.length,6);assert(!fields.some(field=>field.key==='attackInterval'));
   first.reference=true;first.rotation=90;
@@ -196,11 +196,11 @@ test('rocket reference inputs preserve per-aircraft axes without ship-specific c
   ];
   const weapon={name:'TEST_ROCKET',planeAmmoType:'rocket'};
   for(const [name,outerSalvoSize,minSpread,maxSpread,minWidth,maxWidth,maxHeight]of cases){
-    const raw={name,bombName:weapon.name,outerSalvoSize,minSpread,maxSpread};
+    const raw={name,bombName:weapon.name,outerSalvoSize,minSpread,maxSpread,innerSalvoSize:[.5,.5],innerBombsPercentage:50,attackerSize:1,projectilesPerAttack:1,attackCount:1,attackInterval:0,formations:{attack:[null,[[0,0,0]]]}};
     const r=core.analyze(raw,name+'.json',weapon);
-    assert(Math.abs(r.aimMinimum.width-minWidth)<1e-8,name);
-    assert(Math.abs(r.outer.width-maxWidth)<1e-8,name);
-    assert(Math.abs(r.outer.height-maxHeight)<1e-8,name);
+    assert(Math.abs(r.aimMinimum.width-2*minWidth)<1e-8,name);
+    assert(Math.abs(r.outer.width-2*maxWidth)<1e-8,name);
+    assert(Math.abs(r.outer.height-2*maxHeight)<1e-8,name);
     r.reference=true;r.rotation=90;
     const scale=core.commonRocketScale([r]);
     assert(r.outer.width*scale<=260+1e-8,name);

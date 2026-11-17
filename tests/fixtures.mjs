@@ -5,7 +5,7 @@ export function writeFixtureDataset(root,game='KORABLI',version='fixture-A',incl
   const base=path.join(root,'GAME',game,version);
   for(const folder of ['Ships','Aircraft','Projectiles'])fs.mkdirSync(path.join(base,folder),{recursive:true});
   const aircraft={typeinfo:{type:'Aircraft'},outerSalvoSize:[2,4],innerSalvoSize:[1,2],minSpread:[1,1],maxSpread:[2,2],innerBombsPercentage:50,speedMoveWithBomb:100,attackCount:1,attackInterval:0.1,attackerSize:2,projectilesPerAttack:1,throttleAcceleration:0.1,throttleDeceleration:0,speedMin:0.8,speedMax:1.25,flightHeight:10};
-  const bomb={...aircraft,name:'TEST_BOMBER',bombName:'TEST_BOMB'};
+  const bomb={...aircraft,name:'TEST_BOMBER',bombName:'TEST_BOMB',formations:{attack:[0.1,[[-1,0,0],[1,0,0]]]}};
   const torpedo={name:'TEST_TORPEDO_STOCK',typeinfo:{type:'Aircraft'},torpedoName:'TEST_TORPEDO',minSpread:10,maxSpread:100,torpedoAimDist:50,attackerSize:2,projectilesPerAttack:1,attackCount:1,formations:{attack:[null,[[-2,0,0],[2,0,0]]]}};
   const researched={...torpedo,name:'TEST_TORPEDO_TOP',minSpread:8};
   const airstrike={...aircraft,name:'TEST_AIRSTRIKE',isAirSupportPlane:true,bombName:'TEST_BOMB',attackCount:3};
@@ -14,7 +14,7 @@ export function writeFixtureDataset(root,game='KORABLI',version='fixture-A',incl
     A_AirSupport:{planeName:airstrike.name,minDist:100,maxDist:1000,useFixedTimeToAttackPoint:true,minTimeToAttackPoint:1,maxTimeToAttackPoint:4,maxTimeToAttackPointDistance:1000},
     ShipUpgradeInfo:{TEST_TB_STOCK:{components:{torpedoBomber:['A1_TorpedoBomber']},prev:''},TEST_TB_TOP:{components:{torpedoBomber:['A2_TorpedoBomber']},prev:'TEST_TB_STOCK'}}};
   const projectiles=[{name:'TEST_BOMB',typeinfo:{type:'Projectile'},ammoType:'HE',withParachute:true,fallTime:2},{name:'TEST_TORPEDO',typeinfo:{type:'Projectile'},ammoType:'torpedo',speed:20,armingTime:2,maxDist:100}];
-  const attack={...aircraft,name:'TEST_ATTACK',bombName:'TEST_ROCKET'};
+  const attack={...aircraft,name:'TEST_ATTACK',bombName:'TEST_ROCKET',formations:{attack:[null,[[-1,0,0],[1,0,0]]]}};
   const skip={...aircraft,name:'TEST_SKIP',typeinfo:{type:'Aircraft',species:'Skip'},bombName:'TEST_SKIP_BOMB',aimingHeight:6};
   if(includeAttack){ship.A_AttackAircraft={planes:[attack.name]};projectiles.push({name:'TEST_ROCKET',typeinfo:{type:'Projectile',species:'Rocket'},ammoType:'HE',planeAmmoType:'rocket'});}
   if(includeSkip){ship.A_SkipBomber={planes:[skip.name]};projectiles.push({name:'TEST_SKIP_BOMB',typeinfo:{type:'Projectile',species:'SkipBomb'},ammoType:'HE',planeAmmoType:'skip',projectileVelocityBoost:[1,1],fallingTimeCoef:1,maxSkipAngle:20,skips:[[1,1,.9,1.2,.6]]});}

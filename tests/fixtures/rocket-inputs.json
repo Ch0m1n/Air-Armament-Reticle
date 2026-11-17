@@ -1,0 +1,207 @@
+[
+  {
+    "raw": {
+      "name": "PRAF902_A_NAKHIMOV_TOP",
+      "attackerSize": 8,
+      "projectilesPerAttack": 1,
+      "attackCount": 4,
+      "attackInterval": 0.05,
+      "outerSalvoSize": [
+        8.0,
+        3.0
+      ],
+      "innerSalvoSize": [
+        3.96,
+        1.67
+      ],
+      "innerBombsPercentage": 50.0,
+      "minSpread": [
+        1,
+        1
+      ],
+      "maxSpread": [
+        2.5,
+        2.5
+      ],
+      "formations": {
+        "attack": [
+          0.1,
+          [
+            [
+              -0.8,
+              0,
+              0
+            ],
+            [
+              0.8,
+              0,
+              0
+            ],
+            [
+              -1.6,
+              -0.25,
+              0.8
+            ],
+            [
+              0,
+              0,
+              0.8
+            ],
+            [
+              1.6,
+              -0.25,
+              0.8
+            ],
+            [
+              -0.8,
+              -0.25,
+              1.5
+            ],
+            [
+              0.8,
+              -0.25,
+              1.5
+            ],
+            [
+              0,
+              -0.25,
+              2.3
+            ]
+          ]
+        ]
+      }
+    },
+    "count": 32,
+    "quotas": [
+      4,
+      4,
+      4,
+      4
+    ]
+  },
+  {
+    "raw": {
+      "name": "PBAF308_COLOSSUS_STOCK",
+      "attackerSize": 3,
+      "projectilesPerAttack": 1,
+      "attackCount": 6,
+      "attackInterval": 0.05,
+      "outerSalvoSize": [
+        4.53,
+        1.87
+      ],
+      "innerSalvoSize": [
+        2.86,
+        1.05
+      ],
+      "innerBombsPercentage": 33.0,
+      "minSpread": [
+        1,
+        1
+      ],
+      "maxSpread": [
+        2.5,
+        2.5
+      ],
+      "formations": {
+        "attack": [
+          0.1,
+          [
+            [
+              0.0,
+              0.0,
+              -2.5
+            ],
+            [
+              -2.5,
+              0,
+              0
+            ],
+            [
+              2.5,
+              0,
+              0
+            ]
+          ]
+        ]
+      }
+    },
+    "count": 18,
+    "quotas": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "raw": {
+      "name": "PAAF217_YORKTOWN_STOCK",
+      "attackerSize": 6,
+      "projectilesPerAttack": 1,
+      "attackCount": 2,
+      "attackInterval": 0.1,
+      "outerSalvoSize": [
+        3.53,
+        1.43
+      ],
+      "innerSalvoSize": [
+        2.75,
+        1.11
+      ],
+      "innerBombsPercentage": 75.0,
+      "minSpread": [
+        1,
+        1
+      ],
+      "maxSpread": [
+        4,
+        4
+      ],
+      "formations": {
+        "attack": [
+          0.1,
+          [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              -1.6,
+              -0.25,
+              0
+            ],
+            [
+              1.6,
+              -0.25,
+              0
+            ],
+            [
+              -0.8,
+              -0.25,
+              1
+            ],
+            [
+              0.8,
+              -0.25,
+              1
+            ],
+            [
+              0,
+              -0.25,
+              2
+            ]
+          ]
+        ]
+      }
+    },
+    "count": 12,
+    "quotas": [
+      5,
+      4
+    ]
+  }
+]
