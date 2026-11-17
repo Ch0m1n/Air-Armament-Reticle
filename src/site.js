@@ -382,7 +382,8 @@ async function addEntry(id,slot=null) {
   attachData(item,modified.projectile,[shipManifest(ship,ship.name+'.json')]);
   if(!slot){slot=slotFromEntry(entry);shipSlots.push(slot);}
   slot.modifiers=modified.overrides;
-  Object.assign(item,{id:old?.id||nextSelection++,slotId:slot.id,catalogId:entry.id,shipLabel:comparisonShipLabel(slot),files:entry.files,reference:old?.reference??true});
+  Object.assign(item,{id:old?.id||nextSelection++,slotId:slot.id,catalogId:entry.id,shipLabel:comparisonShipLabel(slot),files:entry.files,reference:old?.reference??true,
+    rotation:old?.rotation||0,aimMode:old?.aimMode||'fully',envelopeView:old?.envelopeView||'aim'});
   item.game=slotGame(slot);item.version=slot.version;
   slot.entryId=entry.id;
   slot.modifiers=modified.overrides;item.modifiers=modified.overrides;
