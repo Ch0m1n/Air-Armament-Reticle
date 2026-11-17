@@ -238,7 +238,10 @@ function analyzeAirstrike(result) {
 function simulateAirstrike(r,random=Math.random) {
   if(!r.weaponVerified||!r.payload)return [];
   const p=r.payload,points=[],inner=r.inner;
-  const split=inner&&r.innerPercentage!=null;
+  const split=inner&&positive(inner.width)&&positive(inner.baseHeight)
+     &&inner.width<=r.outer.width&&inner.baseHeight<=r.outer.baseHeight
+     &&(inner.width<r.outer.width||inner.baseHeight<r.outer.baseHeight)
+     &&finite(r.innerPercentage)&&r.innerPercentage>=0&&r.innerPercentage<=100;
   const sample=d=>{const radius=Math.sqrt(random()),angle=random()*Math.PI*2;return {x:Math.cos(angle)*radius*d.width/2,y:Math.sin(angle)*radius*d.baseHeight/2};};
   for(let release=0;release<p.releases;release++)for(let i=0;i<p.aircraft*p.perRelease;i++) {
     let point=null;

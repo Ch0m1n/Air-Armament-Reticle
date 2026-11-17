@@ -626,6 +626,7 @@ ui('cards-view').addEventListener('click',()=>{cardView=true;renderComparison();
 ui('list-view').addEventListener('click',()=>{cardView=false;renderComparison();});
 ui('clear').addEventListener('click',()=>{if(busy)return;selections.length=0;shipSlots.length=0;shipSlots.push(newSlot());uploadedShips.clear();uploadedAircraft.clear();uploadedWeapons.clear();notice('');renderLibrary();renderComparison();});
 function handleReticleClick(event){
+  if(busy)return;
   const button=event.target.closest('[data-action]');
   if(!button){
     const drawing=event.target.closest('[data-expand]');
